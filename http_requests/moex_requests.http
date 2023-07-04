@@ -1,0 +1,23 @@
+GET http://localhost:80/api/item?id=99
+Accept: application/json
+
+
+### Общая информация о торговом рынке
+########################
+GET {{url}}/iss.json
+Accept: application/json
+Content-Type: application/json
+
+
+### Исторические данные
+########################
+GET {{url}}/iss/history/stock/markets/index/securities.json?date=2022-08-29
+Accept: application/json
+Content-Type: application/json
+
+
+### Получить список бумаг
+########################
+GET {{url}}/iss/securities.json
+Accept: application/json
+Content-Type: application/json
