@@ -3,6 +3,7 @@ from fastapi import APIRouter
 
 from tinkoff.invest.async_services import AsyncServices
 
+from src.access_layer.sandbox.sandbox_db import save_account_sandbox
 from src.consts import TINKOFF_INVEST
 from src.entrypoint.api_v1.schemas.response_schemas import CreateAccountSandboxResponse
 
