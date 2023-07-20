@@ -5,7 +5,8 @@ from os.path import join
 from ssl import SSLContext
 from typing import Any, Generic, Optional, Type, TypeVar
 
-from aiohttp import ClientResponse, ClientTimeout, Fingerprint, MultipartWriter, ClientSession
+from aiohttp import (ClientResponse, ClientSession, ClientTimeout, Fingerprint,
+                     MultipartWriter)
 from aiohttp.typedefs import StrOrURL
 from aiomisc import Service
 from pydantic import BaseModel

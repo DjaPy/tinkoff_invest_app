@@ -1,4 +1,4 @@
-from pydantic import BaseModel, MongoDsn, Field
+from pydantic import BaseModel, Field, MongoDsn
 
 
 class MongoDBSettings(BaseModel):

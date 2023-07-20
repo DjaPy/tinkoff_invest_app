@@ -5,7 +5,8 @@ from aiomisc import entrypoint
 from src.base.fastapi_service import FastAPIService
 from src.base.mongo_service.service import MongoDBService
 from src.config import config
-from src.consts import FASTAPI_SERVICE, TINKOFF_INVEST, MONGO_DB
+from src.consts import FASTAPI_SERVICE, MONGO_DB, TINKOFF_INVEST
+from src.sandbox.entrypoint.api_v1.account import account_router
 from src.tinkoff_invest.service import TinkoffInvestService
 
 fastapi_service = FastAPIService(settings=config.http, context_name=FASTAPI_SERVICE, app_name=config.app_name)
@@ -27,4 +28,5 @@ if __name__ == '__main__':
         policy=asyncio.DefaultEventLoopPolicy(),
         debug=False
     ) as loop:
+        fastapi_service.fastapi.include_router(account_router)
         loop.run_forever()

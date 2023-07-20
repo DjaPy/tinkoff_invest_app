@@ -1,9 +1,8 @@
-from tinkoff.invest import AsyncClient
-
 from aiomisc import Service
+from tinkoff.invest import AsyncClient
+from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 
 from src.tinkoff_invest.config import TinkoffInvestSettings
-from tinkoff.invest.constants import INVEST_GRPC_API_SANDBOX
 
 
 class TinkoffInvestService(Service):
@@ -20,8 +19,8 @@ class TinkoffInvestService(Service):
             target=INVEST_GRPC_API_SANDBOX,
             sandbox_token=self._settings.sandbox_token,
         )
-        await self._client.__aenter__()
-        self.context[self._context_name] = self._client
+        service = await self._client.__aenter__()
+        self.context[self._context_name] = service
 
     async def stop(self, except_=None) -> None:
         await self._client.__aexit__(self, None, None)

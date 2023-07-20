@@ -4,7 +4,6 @@ from typing import Any, Iterable, Type
 
 import aiohttp
 from aiohttp import hdrs
-
 from aiohttp.http import SERVER_SOFTWARE
 from prometheus_client import Counter, Histogram
 
