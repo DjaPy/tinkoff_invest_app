@@ -1,23 +1,23 @@
 from datetime import datetime
+from uuid import UUID
 
-from odmantic import Model
+from odmantic import Model, Field
+from pydantic import validator
 
-from src.enums import AccessLevelEnum, AccountStatusEnum, AccountTypeEnum
-
-
-class BaseCollections(Model):
-    created_at: datetime
-    deleted_at: datetime
+from tinkoff.invest import AccessLevel, AccountStatus, AccountType
 
 
-class SandboxAccount(BaseCollections):
+class SandboxAccount(Model):
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
     account_id: str
-    type: AccountTypeEnum
+    type: AccountType
     name: str
-    status: AccountStatusEnum
+    status: AccountStatus
     opened_date: datetime
     closed_date: datetime
-    access_level: AccessLevelEnum
+    access_level: AccessLevel
 
     class Config:
         collection = "accounts"
