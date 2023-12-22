@@ -1,22 +1,25 @@
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
-import pytest
+from tinkoff.invest import AccessLevel, AccountStatus, AccountType
 
-from src.enums import AccessLevelEnum, AccountStatusEnum, AccountTypeEnum
 from src.sandbox.collections import SandboxAccount
 
 
-async def test_mongo_connection(fake, mongo_connection):
+async def test_mongo_db(fake, get_session):
     sandbox = SandboxAccount(
         account_id=fake.numerify(text='########'),
-        type=AccountTypeEnum.ACCOUNT_TYPE_TINKOFF.value,
+        type=AccountType.ACCOUNT_TYPE_TINKOFF.value,
         name=fake.user_name(),
-        status=AccountStatusEnum.ACCOUNT_STATUS_NEW.value,
-        opened_date=datetime.now(),
-        closed_date=datetime.now(),
-        access_level=AccessLevelEnum.ACCOUNT_ACCESS_LEVEL_NO_ACCESS.value,
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        status=AccountStatus.ACCOUNT_STATUS_NEW.value,
+        opened_date=datetime.now(tz=ZoneInfo('utc')),
+        closed_date=datetime.now(tz=ZoneInfo('utc')),
+        access_level=AccessLevel.ACCOUNT_ACCESS_LEVEL_NO_ACCESS.value,
+        created_at=datetime.now(tz=ZoneInfo('utc')),
+        updated_at=datetime.now(tz=ZoneInfo('utc')),
     )
-    sandbox = await mongo_connection.save(sandbox)
+    session = get_session
+    sandbox_db = await sandbox.save(session=session)
+    assert sandbox_db.id
     assert isinstance(sandbox, SandboxAccount)
+

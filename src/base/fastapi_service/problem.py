@@ -1,37 +1,47 @@
 # pylint: disable=no-name-in-module
 
-import typing
 from http import HTTPStatus
-from typing import Any, Optional, TypedDict
+from typing import Any
 
 from fastapi import Response, status
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, Field, model_validator
+from pydantic_core.core_schema import ValidationInfo
 from starlette.background import BackgroundTask
 
-__all__ = ['Problem', 'ProblemResponse', 'ValidationError', 'Unauthorized', 'Forbidden', 'NotFound',
-           'UnprocessableEntity', 'InternalServerError']
+__all__ = [
+    'Problem',
+    'ProblemResponse',
+    'ValidationError',
+    'Unauthorized',
+    'Forbidden',
+    'NotFound',
+    'UnprocessableEntity',
+    'InternalServerError',
+]
+
+from typing_extensions import TypedDict
 
 
 class Problem(BaseModel):
-    type: Optional[str] = None
-    title: Optional[str] = None
-    status: Optional[HTTPStatus] = None
-    detail: Optional[Any] = None
-    instance: Optional[str] = None
-    invalid_params: Optional[Any] = None
+    type: str | None = None
+    title: str | None = None
+    status: HTTPStatus | None = None
+    detail: Any | None = None
+    instance: str | None = None
+    invalid_params: Any | None = None
 
     class Config:
-        fields = {'invalid_params': 'invalid-params'}
-        allow_population_by_field_name = True
+        populate_by_name = True
 
-    @root_validator
-    def title_without_type(cls, values: dict[str, Any]) -> dict[str, Any]:  # pylint: disable=no-self-argument
-        type_ = values.get('type')
-        title = values.get('title')
-        status = values.get('status')
-        if not type_ and status:
-            values['title'] = title or HTTPStatus(status).phrase
-
+    @model_validator(mode='before')
+    @classmethod
+    def title_without_type(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if values:
+            type_ = values.get('type')
+            title = values.get('title')
+            status_ = values.get('status')
+            if not type_ and status_:
+                values['title'] = title or HTTPStatus(status_).phrase
         return values
 
 
@@ -40,53 +50,55 @@ class ValidationError(Problem):
         name: str
         reason: str
 
-    type: str = Field('validation-error', const=True)
-    title: str = Field("Your request parameters didn't validate.", const=True)
-    status: HTTPStatus = Field(HTTPStatus.BAD_REQUEST, const=True)
+    type: str = Field('validation-error')
+    title: str = Field('Your request parameters didn`t validate.')
+    status: HTTPStatus = Field(HTTPStatus.BAD_REQUEST)
     invalid_params: list[Param]
 
 
 class Unauthorized(Problem):
-    type: str = Field('unauthorized', const=True)
+    type: str = Field('unauthorized')
     title: str = Field(
         'The request has not been applied because it lacks valid authentication credentials for the target resource.',
-        const=True)
-    status: HTTPStatus = Field(HTTPStatus.UNAUTHORIZED, const=True)
+    )
+    status: HTTPStatus = Field(HTTPStatus.UNAUTHORIZED)
 
 
 class Forbidden(Problem):
-    type: str = Field('forbidden', const=True)
-    title: str = Field('The server understood the request but refuses to authorize it.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.FORBIDDEN, const=True)
+    type: str = Field('forbidden')
+    title: str = Field(
+        'The server understood the request but refuses to authorize it.'
+    )
+    status: HTTPStatus = Field(HTTPStatus.FORBIDDEN)
 
 
 class NotFound(Problem):
-    type: str = Field('not-found', const=True)
-    title: str = Field('Requested resource is not available.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.NOT_FOUND, const=True)
+    type: str = Field('not-found')
+    title: str = Field('Requested resource is not available.')
+    status: HTTPStatus = Field(HTTPStatus.NOT_FOUND)
 
 
 class UnprocessableEntity(Problem):
     type: str
-    status: HTTPStatus = Field(HTTPStatus.UNPROCESSABLE_ENTITY, const=True)
+    status: HTTPStatus = Field(HTTPStatus.UNPROCESSABLE_ENTITY)
 
 
 class InternalServerError(Problem):
-    type: str = Field('internal-server-error', const=True)
-    title: str = Field('Internal server error.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.INTERNAL_SERVER_ERROR, const=True)
+    type: str = Field('internal-server-error')
+    title: str = Field('Internal server error.')
+    status: HTTPStatus = Field(HTTPStatus.INTERNAL_SERVER_ERROR)
 
 
 class ProblemResponse(Response):
     media_type = 'application/problem+json'
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         content: Problem,
         status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-        headers: typing.Optional[dict] = None,
-        media_type: typing.Optional[str] = None,
-        background: typing.Optional[BackgroundTask] = None,
+        headers: dict | None = None,
+        media_type: str | None = None,
+        background: BackgroundTask | None = None,
     ) -> None:
         if isinstance(content, Problem):
             status_code = content.status.value if content.status else status_code

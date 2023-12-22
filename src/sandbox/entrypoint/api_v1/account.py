@@ -19,10 +19,10 @@ account_router = APIRouter(prefix="/account")
 )
 async def create_sandbox_account() -> SandboxAccount:
     invest_client: AsyncServices = await get_context()[TINKOFF_INVEST]
-    account_sandbox = await invest_client.sandbox.open_sandbox_account()
-    accounts = await invest_client.sandbox.get_sandbox_accounts()
-    await save_account_sandbox(accounts)
-    return await get_account_sandbox_data_by_account_id(accounts[0].account_id)
+    await invest_client.sandbox.open_sandbox_account()
+    accounts_resp = await invest_client.sandbox.get_sandbox_accounts()
+    await save_account_sandbox(accounts_resp.accounts)
+    return await get_account_sandbox_data_by_account_id(accounts_resp.accounts[0].id)
 
 
 @account_router.get(
@@ -38,4 +38,5 @@ async def get_sandbox_account_by_account_id(account_id: str) -> SandboxAccount:
     response_model=AccountsSandboxResponse,
 )
 async def get_sandbox_accounts() -> AccountsSandboxResponse:
-    return AccountsSandboxResponse(accounts=await get_all_accounts_sandbox())
+    accounts = await get_all_accounts_sandbox()
+    return AccountsSandboxResponse(accounts=accounts)
