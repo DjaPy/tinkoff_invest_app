@@ -2,7 +2,7 @@ from dataclasses import asdict
 
 from aiomisc import get_context
 from bson import ObjectId
-from tinkoff.invest import GetAccountsResponse, Account
+from tinkoff.invest import Account
 
 from src.consts import MONGO_DB
 from src.sandbox.collections import SandboxAccount

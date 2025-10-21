@@ -5,7 +5,6 @@ from typing import Any
 
 from fastapi import Response, status
 from pydantic import BaseModel, Field, model_validator
-from pydantic_core.core_schema import ValidationInfo
 from starlette.background import BackgroundTask
 
 __all__ = [

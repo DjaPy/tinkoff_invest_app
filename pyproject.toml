@@ -4,13 +4,14 @@ version = "0.1.0"
 description = ""
 authors = ["sergey <djapy@yandex.ru>"]
 readme = "README.md"
+package-mode = false
 
 
 [tool.ruff]
 # ignore error # noqa: UP006
 target-version = "py310"
 line-length = 120
-select = ["E", "F", "R", "C", "W", "C90"]
+select = ["E", "F", "C", "W", "C90"]
 
 [tool.ruff.mccabe]
 # Unlike Flake8, default to a complexity level of 10.
@@ -30,20 +31,21 @@ asyncio_mode="auto"
 
 
 [tool.poetry.dependencies]
-python = "^3.11"
-aiomisc = "^17.3.2"
-fastapi = "^0.104.0"
-aiohttp = "^3.8.6"
-tinkoff-investments = "^0.2.0b60"
-uvicorn = "^0.23.0"
-opentelemetry-api = "^1.20.0"
-opentelemetry-sdk = "^1.20.0"
-prometheus-client = "^0.17.0"
+python = "^3.12"
+aiomisc = "^17.9.4"
+fastapi = "^0.119.0"
+aiohttp = "^3.13.0"
+tinkoff-investments = "^0.2.0b117"
+uvicorn = "^0.37.0"
+opentelemetry-api = "^1.37.0"
+opentelemetry-sdk = "^1.37.0"
+prometheus-client = "^0.23.1"
 instrumental = "^0.5.3"
-opentelemetry-instrumentation-fastapi = "^0.41b0"
-pydantic = {extras = ["dotenv"], version = "^2.4.2"}
-beanie = "^1.23.1"
-pydantic-settings = "^2.0.3"
+opentelemetry-instrumentation-fastapi = "^0.58b0"
+pydantic = {extras = ["dotenv"], version = "^2.12.0"}
+beanie = "^1.30.0"
+pydantic-settings = "^2.11.0"
+rstr = "^3.2.2"
 
 
 [tool.poetry.group.dev.dependencies]
