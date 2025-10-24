@@ -110,7 +110,7 @@ class FastAPIService(Service):
 
         for exception, handler in self.MAP_EXCEPTION_HANDLER.items():
             if hasattr(self, handler.__name__):
-                self.__fastapi.exception_handler(exception)(partial(handler, self))
+                self.__fastapi.exception_handler(exception)(partial(handler, self))  # type: ignore[misc]
             else:
                 self.__fastapi.exception_handler(exception)(handler)
 

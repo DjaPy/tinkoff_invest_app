@@ -15,7 +15,3 @@ Features:
 
 __version__ = "1.0.0"
 __author__ = "Tinkoff Invest App"
-
-from .algo_trading import analytics, api, models, repositories, risk, services
-
-__all__ = ["models", "services", "api", "risk", "analytics", "repositories"]

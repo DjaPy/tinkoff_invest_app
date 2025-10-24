@@ -2,6 +2,8 @@ import asyncio
 
 from aiomisc import entrypoint
 
+from src.algo_trading.ports.api.v1 import (analytics_router, orders_router,
+                                           positions_router, strategies_router)
 from src.base.fastapi_service import FastAPIService
 from src.base.mongo_service.service import MongoDBService
 from src.config import config
@@ -28,5 +30,13 @@ if __name__ == '__main__':
         policy=asyncio.DefaultEventLoopPolicy(),
         debug=False
     ) as loop:
+        # Register existing routers
         fastapi_service.fastapi.include_router(account_router)
+
+        # Register algo_trading routers
+        fastapi_service.fastapi.include_router(strategies_router)
+        fastapi_service.fastapi.include_router(orders_router)
+        fastapi_service.fastapi.include_router(positions_router)
+        fastapi_service.fastapi.include_router(analytics_router)
+
         loop.run_forever()

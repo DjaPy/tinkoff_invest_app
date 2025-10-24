@@ -3,6 +3,7 @@ from beanie import init_beanie
 from motor.core import AgnosticClient
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from src.algo_trading.adapters.models import BEANIE_MODELS
 from src.base.mongo_service.config import MongoDBSettings
 from src.sandbox.collections import SandboxAccount
 
@@ -25,7 +26,7 @@ class MongoDBService(Service):
         self._client = AsyncIOMotorClient(str(self.settings.dsn))
         await init_beanie(
             database=self._client[self.settings.db_name],
-            document_models=[SandboxAccount],  # type: ignore
+            document_models=[SandboxAccount, *BEANIE_MODELS],  # type: ignore
         )
         self.context[self._context_name] = self._client
 

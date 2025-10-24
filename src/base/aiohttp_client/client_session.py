@@ -51,7 +51,7 @@ class TraceConfigWithHeaderUserAgent(aiohttp.TraceConfig):
 class ClientRequest(aiohttp.ClientRequest):
     _user_agent: str = SERVER_SOFTWARE
 
-    def update_auto_headers(self, skip_auto_headers: Iterable[str]) -> None:
+    def update_auto_headers(self, skip_auto_headers: Iterable[str] | None) -> None:
         super().update_auto_headers(skip_auto_headers)
 
         self.headers[hdrs.USER_AGENT] = self._user_agent
