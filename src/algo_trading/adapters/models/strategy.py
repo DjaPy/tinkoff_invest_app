@@ -62,7 +62,7 @@ class TradingStrategy(Document):
     name: str = Field(min_length=1, max_length=200, description="Strategy name")
     strategy_type: StrategyType = Field(description="Type of trading strategy")
     status: StrategyStatus = Field(default=StrategyStatus.INACTIVE, description="Current execution status")
-    parameters: dict = Field(default_factory=dict, description="Strategy-specific parameters")
+    parameters: dict[str, Decimal] = Field(default_factory=dict, description="Strategy-specific parameters")
     risk_controls: RiskControls = Field(description="Risk management configuration")
     created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")

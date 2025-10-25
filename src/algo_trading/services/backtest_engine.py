@@ -148,7 +148,7 @@ class BacktestEngine:
                 MarketData.instrument == instrument,
                 MarketData.timestamp >= period_start,
                 MarketData.timestamp <= period_end,
-            ).sort(MarketData.timestamp).to_list()
+            ).sort("timestamp").to_list()
 
             data_by_instrument[instrument] = market_data
 

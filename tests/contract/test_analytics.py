@@ -126,8 +126,9 @@ async def test_get_strategy_performance_with_period_filter(client, config, perio
 async def test_get_strategy_performance_custom_date_range(client, config):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports custom date range"""
     strategy_id = uuid4()
-    from_date = (datetime.utcnow() - timedelta(days=30)).date().isoformat()
-    to_date = datetime.utcnow().date().isoformat()
+    datetime_now = datetime.now(UTC)
+    from_date = (datetime_now - timedelta(days=30)).date().isoformat()
+    to_date = datetime_now.date().isoformat()
 
     async with client.get(
         url=f"http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=custom&from_date={from_date}&to_date={to_date}",

@@ -79,8 +79,9 @@ class PerformanceAnalytics:
         # Get all orders
         orders = await TradeOrder.find(
             TradeOrder.strategy_id == strategy_id,
-            TradeOrder.filled_at >= period_start,
-            TradeOrder.filled_at <= period_end,
+            TradeOrder.filled_at is not None,
+            TradeOrder.filled_at >= period_start,  # type: ignore[operator]
+            TradeOrder.filled_at <= period_end,  # type: ignore[operator]
             TradeOrder.status == OrderStatus.FILLED,
         ).to_list()
 
@@ -146,7 +147,7 @@ class PerformanceAnalytics:
         """
         metrics = await PerformanceMetrics.find(
             PerformanceMetrics.strategy_id == strategy_id
-        ).sort(-PerformanceMetrics.period_end).limit(1).to_list()
+        ).sort('-period_end').limit(1).to_list()
 
         return metrics[0] if metrics else None
 
@@ -167,7 +168,7 @@ class PerformanceAnalytics:
         """
         metrics = await PerformanceMetrics.find(
             PerformanceMetrics.strategy_id == strategy_id
-        ).sort(-PerformanceMetrics.period_end).limit(limit).to_list()
+        ).sort('-period_end').limit(limit).to_list()
 
         return metrics
 

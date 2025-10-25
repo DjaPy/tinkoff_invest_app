@@ -7,7 +7,7 @@ It should FAIL until the actual endpoint implementation is complete.
 Following TDD approach - tests written before implementation.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 
 import pytest
@@ -50,6 +50,7 @@ class BacktestResults(BaseModel):
 @pytest.mark.asyncio
 async def test_post_backtest_runs_strategy_backtest(client, config):
     """Test POST /api/v1/analytics/backtest runs a backtest"""
+    datetime
     backtest_request = {
         "strategy_type": "momentum",
         "parameters": {
