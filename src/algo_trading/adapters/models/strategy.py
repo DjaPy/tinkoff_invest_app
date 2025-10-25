@@ -5,6 +5,7 @@ from decimal import Decimal
 from enum import Enum
 from uuid import UUID, uuid4
 
+import pymongo
 from beanie import Document
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
@@ -68,27 +69,70 @@ class TradingStrategy(Document):
     updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
     created_by: str = Field(description="User identifier")
 
+    @classmethod
+    def _validate_required_keys(cls, v: dict, required_keys: set[str], strategy_type: str) -> None:
+        """Validate that required keys are present."""
+        missing_keys = required_keys - set(v.keys())
+        if missing_keys:
+            raise ValueError(f"Missing required parameters for {strategy_type}: {missing_keys}")
+
+    @classmethod
+    def _validate_momentum_params(cls, v: dict) -> None:
+        """Validate momentum strategy parameters."""
+        if "lookback_period" in v and not 1 <= v["lookback_period"] <= 200:
+            raise ValueError("lookback_period must be between 1 and 200")
+        if "momentum_threshold" in v and not 0 <= v["momentum_threshold"] <= 1:
+            raise ValueError("momentum_threshold must be between 0 and 1")
+
+    @classmethod
+    def _validate_mean_reversion_params(cls, v: dict) -> None:
+        """Validate mean reversion strategy parameters."""
+        if "moving_average_period" in v and not 5 <= v["moving_average_period"] <= 200:
+            raise ValueError("moving_average_period must be between 5 and 200")
+        if "std_dev_threshold" in v and not 0 <= v["std_dev_threshold"] <= 5:
+            raise ValueError("std_dev_threshold must be between 0 and 5")
+
+    @classmethod
+    def _validate_arbitrage_params(cls, v: dict) -> None:
+        """Validate arbitrage strategy parameters."""
+        if "spread_threshold" in v and v["spread_threshold"] < 0:
+            raise ValueError("spread_threshold must be non-negative")
+
+    @classmethod
+    def _validate_market_making_params(cls, v: dict) -> None:
+        """Validate market making strategy parameters."""
+        if "bid_ask_spread" in v and v["bid_ask_spread"] <= 0:
+            raise ValueError("bid_ask_spread must be positive")
+
     @field_validator("parameters", mode="after")
     @classmethod
     def validate_parameters(cls, v: dict, info: ValidationInfo) -> dict:
         """Validate strategy parameters based on strategy type."""
         strategy_type = info.data.get("strategy_type")
 
-        # Type-specific validation rules
-        if strategy_type == StrategyType.MOMENTUM:
-            required_keys = {"lookback_period", "momentum_threshold", "instruments", "position_size"}
-        elif strategy_type == StrategyType.MEAN_REVERSION:
-            required_keys = {"moving_average_period", "std_dev_threshold", "instruments"}
-        elif strategy_type == StrategyType.ARBITRAGE:
-            required_keys = {"instrument_pairs", "spread_threshold"}
-        elif strategy_type == StrategyType.MARKET_MAKING:
-            required_keys = {"bid_ask_spread", "inventory_limits", "instruments"}
-        else:
-            return v
+        validators = {
+            StrategyType.MOMENTUM: (
+                {"lookback_period", "momentum_threshold", "instruments", "position_size"},
+                cls._validate_momentum_params,
+            ),
+            StrategyType.MEAN_REVERSION: (
+                {"moving_average_period", "std_dev_threshold", "instruments"},
+                cls._validate_mean_reversion_params,
+            ),
+            StrategyType.ARBITRAGE: (
+                {"instrument_pairs", "spread_threshold"},
+                cls._validate_arbitrage_params,
+            ),
+            StrategyType.MARKET_MAKING: (
+                {"bid_ask_spread", "inventory_limits", "instruments"},
+                cls._validate_market_making_params,
+            ),
+        }
 
-        missing_keys = required_keys - set(v.keys())
-        if missing_keys:
-            raise ValueError(f"Missing required parameters for {strategy_type}: {missing_keys}")
+        if strategy_type in validators:
+            required_keys, validator = validators[strategy_type]
+            cls._validate_required_keys(v, required_keys, str(strategy_type))
+            validator(v)
 
         return v
 
@@ -126,7 +170,7 @@ class TradingStrategy(Document):
         name = "trading_strategies"
         indexes = [
             "strategy_id",
-            [("created_by", 1), ("name", 1)],  # Unique per user
+            [("created_by", pymongo.ASCENDING), ("name", pymongo.ASCENDING)],  # Unique per user
             "status",
-            [("created_at", -1)],  # Most recent first
+            [("created_at", pymongo.DESCENDING)],  # Most recent first
         ]

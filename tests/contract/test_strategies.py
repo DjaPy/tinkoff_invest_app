@@ -9,7 +9,10 @@ from decimal import Decimal
 import pytest
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import TradingStrategy, StrategyStatus, StrategyType, RiskControls
+from src.algo_trading.adapters.models.strategy import (RiskControls,
+                                                       StrategyStatus,
+                                                       StrategyType,
+                                                       TradingStrategy)
 
 
 async def test_get_strategies_returns_strategy_list(client, config):

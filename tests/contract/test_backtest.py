@@ -7,7 +7,7 @@ It should FAIL until the actual endpoint implementation is complete.
 Following TDD approach - tests written before implementation.
 """
 
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
