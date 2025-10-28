@@ -6,7 +6,7 @@ from tinkoff.invest import AccessLevel, AccountStatus, AccountType
 from src.sandbox.collections import SandboxAccount
 
 
-async def test_mongo_db(fake, get_session):
+async def test_mongo_db(fake, get_session, pydantic_generator_data):
     sandbox = SandboxAccount(
         account_id=fake.numerify(text='########'),
         type=AccountType.ACCOUNT_TYPE_TINKOFF.value,
@@ -22,4 +22,3 @@ async def test_mongo_db(fake, get_session):
     sandbox_db = await sandbox.save(session=session)
     assert sandbox_db.id
     assert isinstance(sandbox, SandboxAccount)
-

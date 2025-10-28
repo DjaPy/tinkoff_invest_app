@@ -59,11 +59,7 @@ shell: ## poetry shell
 
 .PHONY: ruff
 ruff: ## ruff
-	poetry run ruff check ./$(NAME)
-
-.PHONY: bandit
-bandit:  # find common security issues in code
-	poetry run bandit -r ./$(NAME)
+	poetry run ruff check ./$(NAME) ./tests
 
 .PHONY: pip-audit
 pip-audit: # checks your installed dependencies for known security vulnerabilities
@@ -78,7 +74,7 @@ isort: ## sorted imports
 	poetry run isort ./$(NAME) ./tests
 
 .PHONY: lint
-lint: isort ruff bandit mypy pip-audit ## lint
+lint: ruff mypy pip-audit ## lint
 
 .PHONY: doc
 docs: venv clean-docs  ## Make documentation and open it in browser

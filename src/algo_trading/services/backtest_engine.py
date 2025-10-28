@@ -8,10 +8,8 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from ..adapters.models.market_data import MarketData
-from ..domain.analytics.performance_calculator import (PerformanceCalculator,
-                                                       PerformanceResult,
-                                                       Trade)
+from src.algo_trading.adapters.models.market_data import MarketData
+from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, PerformanceResult, Trade
 
 
 @dataclass
@@ -24,7 +22,7 @@ class BacktestConfig:
     period_start: datetime
     period_end: datetime
     starting_capital: Decimal
-    commission_rate: Decimal = Decimal("0.001")  # 0.1% per trade
+    commission_rate: Decimal = Decimal('0.001')  # 0.1% per trade
 
 
 @dataclass
@@ -41,8 +39,6 @@ class BacktestResult:
 class BacktestEngineError(Exception):
     """Backtesting operation failed."""
 
-    pass
-
 
 class BacktestEngine:
     """
@@ -51,7 +47,7 @@ class BacktestEngine:
     Simulates strategy execution on historical data.
     """
 
-    def __init__(self, calculator: Optional[PerformanceCalculator] = None):
+    def __init__(self, calculator: Optional[PerformanceCalculator] = None) -> None:
         """
         Initialize BacktestEngine.
 
@@ -60,10 +56,7 @@ class BacktestEngine:
         """
         self.calculator = calculator or PerformanceCalculator()
 
-    async def run_backtest(
-        self,
-        config: BacktestConfig,
-    ) -> BacktestResult:
+    async def run_backtest(self, config: BacktestConfig) -> BacktestResult:
         """
         Run backtest for strategy configuration.
 
@@ -86,19 +79,13 @@ class BacktestEngine:
         )
 
         if not market_data:
-            raise BacktestEngineError("No market data found for backtest period")
+            raise BacktestEngineError('No market data found for backtest period')
 
         # Simulate strategy execution
         trades, equity_curve = await self._simulate_strategy(config, market_data)
 
         # Calculate performance metrics
-        trade_objs = [
-            Trade(
-                pnl=t["pnl"],
-                return_pct=t["return_pct"],
-            )
-            for t in trades
-        ]
+        trade_objs = [Trade(pnl=t['pnl'], return_pct=t['return_pct']) for t in trades]
 
         daily_returns = self._calculate_daily_returns(equity_curve)
 
@@ -144,11 +131,15 @@ class BacktestEngine:
         data_by_instrument = {}
 
         for instrument in instruments:
-            market_data = await MarketData.find(
-                MarketData.instrument == instrument,
-                MarketData.timestamp >= period_start,
-                MarketData.timestamp <= period_end,
-            ).sort("timestamp").to_list()
+            market_data = (
+                await MarketData.find(
+                    MarketData.instrument == instrument,
+                    MarketData.timestamp >= period_start,
+                    MarketData.timestamp <= period_end,
+                )
+                .sort('timestamp')
+                .to_list()
+            )
 
             data_by_instrument[instrument] = market_data
 
@@ -181,8 +172,8 @@ class BacktestEngine:
         current_capital = config.starting_capital
 
         # Simplified momentum strategy simulation
-        if config.strategy_type == "momentum":
-            lookback = config.parameters.get("lookback_period", 20)
+        if config.strategy_type == 'momentum':
+            lookback = config.parameters.get('lookback_period', 20)
 
             for instrument, data in market_data.items():
                 if len(data) < lookback + 1:
@@ -194,12 +185,12 @@ class BacktestEngine:
                     past_price = data[i - lookback].price
                     momentum = (current_price - past_price) / past_price
 
-                    threshold = Decimal(str(config.parameters.get("momentum_threshold", 0.02)))
+                    threshold = Decimal(str(config.parameters.get('momentum_threshold', 0.02)))
 
                     # Generate signal
                     if momentum > threshold:
                         # Buy signal
-                        quantity = Decimal("1")  # Simplified position sizing
+                        quantity = Decimal('1')  # Simplified position sizing
                         entry_price = current_price
                         commission = entry_price * quantity * config.commission_rate
 
@@ -213,17 +204,19 @@ class BacktestEngine:
                         current_capital += pnl
                         equity_curve.append(current_capital)
 
-                        trades.append({
-                            "instrument": instrument,
-                            "entry_time": data[i].timestamp,
-                            "exit_time": data[exit_idx].timestamp,
-                            "entry_price": entry_price,
-                            "exit_price": exit_price,
-                            "quantity": quantity,
-                            "pnl": pnl,
-                            "return_pct": return_pct,
-                            "commission": commission * 2,
-                        })
+                        trades.append(
+                            {
+                                'instrument': instrument,
+                                'entry_time': data[i].timestamp,
+                                'exit_time': data[exit_idx].timestamp,
+                                'entry_price': entry_price,
+                                'exit_price': exit_price,
+                                'quantity': quantity,
+                                'pnl': pnl,
+                                'return_pct': return_pct,
+                                'commission': commission * 2,
+                            },
+                        )
 
         # Ensure equity curve has at least ending value
         if len(equity_curve) == 1:
@@ -241,7 +234,8 @@ class BacktestEngine:
         Returns:
             List of daily returns
         """
-        if len(equity_curve) < 2:
+        min_len_equity_curve = 2
+        if len(equity_curve) < min_len_equity_curve:
             return []
 
         returns = []
@@ -252,10 +246,7 @@ class BacktestEngine:
 
         return returns
 
-    async def compare_strategies(
-        self,
-        configs: list[BacktestConfig],
-    ) -> list[BacktestResult]:
+    async def compare_strategies(self, configs: list[BacktestConfig]) -> list[BacktestResult]:
         """
         Run backtests for multiple strategy configurations and compare.
 
@@ -271,9 +262,9 @@ class BacktestEngine:
             try:
                 result = await self.run_backtest(config)
                 results.append(result)
-            except BacktestEngineError as e:
+            except BacktestEngineError:
                 # Log error but continue with other configs
-                print(f"Backtest failed for {config.strategy_type}: {e}")
+                pass
 
         # Sort by Sharpe ratio (best first)
         results.sort(key=lambda r: r.performance.sharpe_ratio, reverse=True)

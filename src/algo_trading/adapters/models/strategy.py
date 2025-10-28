@@ -9,45 +9,49 @@ import pymongo
 from beanie import Document
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
+MAX_PERIOD = 200
+MIN_MOVING_AVERAGE = 5
+MAX_STD_DEV_THRESHOLD = 5
+
 
 class StrategyType(str, Enum):
     """Trading strategy types."""
 
-    MOMENTUM = "momentum"
-    MEAN_REVERSION = "mean_reversion"
-    ARBITRAGE = "arbitrage"
-    MARKET_MAKING = "market_making"
+    MOMENTUM = 'momentum'
+    MEAN_REVERSION = 'mean_reversion'
+    ARBITRAGE = 'arbitrage'
+    MARKET_MAKING = 'market_making'
 
 
 class StrategyStatus(str, Enum):
     """Strategy execution status."""
 
-    INACTIVE = "inactive"
-    ACTIVE = "active"
-    PAUSED = "paused"
-    STOPPED = "stopped"
-    ERROR = "error"
+    INACTIVE = 'inactive'
+    ACTIVE = 'active'
+    PAUSED = 'paused'
+    STOPPED = 'stopped'
+    ERROR = 'error'
 
 
 class RiskControls(BaseModel):
     """Risk management controls embedded in strategy."""
 
-    max_position_size: Decimal = Field(description="Maximum position size per instrument")
-    max_portfolio_value: Decimal = Field(description="Maximum total portfolio value")
-    stop_loss_percent: Decimal = Field(description="Stop-loss threshold (0.05 = 5%)", ge=0, le=1)
-    max_drawdown_percent: Decimal = Field(description="Maximum drawdown before halt", ge=0, le=1)
-    daily_loss_limit: Decimal = Field(description="Daily loss limit in currency", gt=0)
-    max_orders_per_day: int = Field(description="Maximum orders per trading day", gt=0)
-    trading_hours_start: str = Field(description="Trading start time (HH:MM:SS)")
-    trading_hours_end: str = Field(description="Trading end time (HH:MM:SS)")
-    enabled: bool = Field(default=True, description="Risk controls active flag")
+    max_position_size: Decimal = Field(description='Maximum position size per instrument')
+    max_portfolio_value: Decimal = Field(description='Maximum total portfolio value')
+    stop_loss_percent: Decimal = Field(description='Stop-loss threshold (0.05 = 5%)', ge=0, le=1)
+    max_drawdown_percent: Decimal = Field(description='Maximum drawdown before halt', ge=0, le=1)
+    daily_loss_limit: Decimal = Field(description='Daily loss limit in currency', gt=0)
+    max_orders_per_day: int = Field(description='Maximum orders per trading day', gt=0)
+    trading_hours_start: str = Field(description='Trading start time (HH:MM:SS)')
+    trading_hours_end: str = Field(description='Trading end time (HH:MM:SS)')
+    enabled: bool = Field(default=True, description='Risk controls active flag')
 
-    @field_validator("stop_loss_percent", "max_drawdown_percent")
+    @field_validator('stop_loss_percent', 'max_drawdown_percent')
     @classmethod
     def validate_percentage(cls, v: Decimal) -> Decimal:
         """Ensure percentages are between 0 and 1."""
-        if not (Decimal("0") <= v <= Decimal("1")):
-            raise ValueError("Percentage must be between 0 and 1")
+        if not (Decimal('0') <= v <= Decimal('1')):
+            raise ValueError('Percentage must be between 0 and 1')
         return v
 
 
@@ -59,72 +63,69 @@ class TradingStrategy(Document):
     Follows Hexagonal Architecture as an Adapter (infrastructure layer).
     """
 
-    strategy_id: UUID = Field(default_factory=uuid4, description="Unique strategy identifier")
-    name: str = Field(min_length=1, max_length=200, description="Strategy name")
-    strategy_type: StrategyType = Field(description="Type of trading strategy")
-    status: StrategyStatus = Field(default=StrategyStatus.INACTIVE, description="Current execution status")
-    parameters: dict[str, Decimal] = Field(default_factory=dict, description="Strategy-specific parameters")
-    risk_controls: RiskControls = Field(description="Risk management configuration")
-    created_at: datetime = Field(default_factory=datetime.utcnow, description="Creation timestamp")
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description="Last update timestamp")
-    created_by: str = Field(description="User identifier")
+    strategy_id: UUID = Field(default_factory=uuid4, description='Unique strategy identifier')
+    name: str = Field(min_length=1, max_length=200, description='Strategy name')
+    strategy_type: StrategyType = Field(description='Type of trading strategy')
+    status: StrategyStatus = Field(default=StrategyStatus.INACTIVE, description='Current execution status')
+    parameters: dict[str, Decimal] = Field(default_factory=dict, description='Strategy-specific parameters')
+    risk_controls: RiskControls = Field(description='Risk management configuration')
+    created_at: datetime = Field(default_factory=datetime.utcnow, description='Creation timestamp')
+    updated_at: datetime = Field(default_factory=datetime.utcnow, description='Last update timestamp')
+    created_by: str = Field(description='User identifier')
 
     @classmethod
     def _validate_required_keys(cls, v: dict, required_keys: set[str], strategy_type: str) -> None:
         """Validate that required keys are present."""
         missing_keys = required_keys - set(v.keys())
         if missing_keys:
-            raise ValueError(f"Missing required parameters for {strategy_type}: {missing_keys}")
+            raise ValueError(f'Missing required parameters for {strategy_type}: {missing_keys}')
 
     @classmethod
     def _validate_momentum_params(cls, v: dict) -> None:
         """Validate momentum strategy parameters."""
-        if "lookback_period" in v and not 1 <= v["lookback_period"] <= 200:
-            raise ValueError("lookback_period must be between 1 and 200")
-        if "momentum_threshold" in v and not 0 <= v["momentum_threshold"] <= 1:
-            raise ValueError("momentum_threshold must be between 0 and 1")
+        if 'lookback_period' in v and not 1 <= v['lookback_period'] <= MAX_PERIOD:
+            raise ValueError('lookback_period must be between 1 and 200')
+        if 'momentum_threshold' in v and not 0 <= v['momentum_threshold'] <= 1:
+            raise ValueError('momentum_threshold must be between 0 and 1')
 
     @classmethod
     def _validate_mean_reversion_params(cls, v: dict) -> None:
         """Validate mean reversion strategy parameters."""
-        if "moving_average_period" in v and not 5 <= v["moving_average_period"] <= 200:
-            raise ValueError("moving_average_period must be between 5 and 200")
-        if "std_dev_threshold" in v and not 0 <= v["std_dev_threshold"] <= 5:
-            raise ValueError("std_dev_threshold must be between 0 and 5")
+        if 'moving_average_period' in v and not MIN_MOVING_AVERAGE <= v['moving_average_period'] <= MAX_PERIOD:
+            raise ValueError('moving_average_period must be between 5 and 200')
+        if 'std_dev_threshold' in v and not 0 <= v['std_dev_threshold'] <= MAX_STD_DEV_THRESHOLD:
+            raise ValueError('std_dev_threshold must be between 0 and 5')
 
     @classmethod
     def _validate_arbitrage_params(cls, v: dict) -> None:
         """Validate arbitrage strategy parameters."""
-        if "spread_threshold" in v and v["spread_threshold"] < 0:
-            raise ValueError("spread_threshold must be non-negative")
+        if 'spread_threshold' in v and v['spread_threshold'] < 0:
+            raise ValueError('spread_threshold must be non-negative')
 
     @classmethod
     def _validate_market_making_params(cls, v: dict) -> None:
         """Validate market making strategy parameters."""
-        if "bid_ask_spread" in v and v["bid_ask_spread"] <= 0:
-            raise ValueError("bid_ask_spread must be positive")
+        if 'bid_ask_spread' in v and v['bid_ask_spread'] <= 0:
+            raise ValueError('bid_ask_spread must be positive')
 
-    @field_validator("parameters", mode="after")
+    @field_validator('parameters', mode='after')
     @classmethod
     def validate_parameters(cls, v: dict, info: ValidationInfo) -> dict:
         """Validate strategy parameters based on strategy type."""
-        strategy_type = info.data.get("strategy_type")
+        strategy_type = info.data.get('strategy_type')
 
         validators = {
             StrategyType.MOMENTUM: (
-                {"lookback_period", "momentum_threshold", "instruments", "position_size"},
+                {'lookback_period', 'momentum_threshold', 'instruments', 'position_size'},
                 cls._validate_momentum_params,
             ),
             StrategyType.MEAN_REVERSION: (
-                {"moving_average_period", "std_dev_threshold", "instruments"},
+                {'moving_average_period', 'std_dev_threshold', 'instruments'},
                 cls._validate_mean_reversion_params,
             ),
-            StrategyType.ARBITRAGE: (
-                {"instrument_pairs", "spread_threshold"},
-                cls._validate_arbitrage_params,
-            ),
+            StrategyType.ARBITRAGE: ({'instrument_pairs', 'spread_threshold'}, cls._validate_arbitrage_params),
             StrategyType.MARKET_MAKING: (
-                {"bid_ask_spread", "inventory_limits", "instruments"},
+                {'bid_ask_spread', 'inventory_limits', 'instruments'},
                 cls._validate_market_making_params,
             ),
         }
@@ -159,18 +160,16 @@ class TradingStrategy(Document):
     def update_status(self, new_status: StrategyStatus) -> None:
         """Update strategy status with validation."""
         if not self.can_transition_to(new_status):
-            raise ValueError(
-                f"Invalid status transition from {self.status} to {new_status}"
-            )
+            raise ValueError(f'Invalid status transition from {self.status} to {new_status}')
 
         self.status = new_status
         self.updated_at = datetime.utcnow()
 
     class Settings:
-        name = "trading_strategies"
+        name = 'trading_strategies'
         indexes = [
-            "strategy_id",
-            [("created_by", pymongo.ASCENDING), ("name", pymongo.ASCENDING)],  # Unique per user
-            "status",
-            [("created_at", pymongo.DESCENDING)],  # Most recent first
+            'strategy_id',
+            [('created_by', pymongo.ASCENDING), ('name', pymongo.ASCENDING)],  # Unique per user
+            'status',
+            [('created_at', pymongo.DESCENDING)],  # Most recent first
         ]

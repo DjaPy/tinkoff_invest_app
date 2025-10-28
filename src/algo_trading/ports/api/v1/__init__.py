@@ -1,13 +1,8 @@
 """API v1 endpoints for algorithmic trading."""
 
-from .analytics import analytics_router
-from .orders import orders_router
-from .positions import positions_router
-from .strategies import strategies_router
+from src.algo_trading.ports.api.v1.analytics import analytics_router
+from src.algo_trading.ports.api.v1.orders import orders_router
+from src.algo_trading.ports.api.v1.positions import positions_router
+from src.algo_trading.ports.api.v1.strategies import strategies_router
 
-__all__ = [
-    "strategies_router",
-    "orders_router",
-    "positions_router",
-    "analytics_router",
-]
+__all__ = ['analytics_router', 'orders_router', 'positions_router', 'strategies_router']

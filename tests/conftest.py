@@ -25,7 +25,7 @@ def config():
     return build_config
 
 
-@pytest.fixture()
+@pytest.fixture
 async def mongo_connection(config):
     name_database = f'{uuid.uuid4().hex}_pytest'
     _client = AsyncIOMotorClient(str(config.mongo_db.dsn))
@@ -41,19 +41,19 @@ async def get_session(mongo_connection):
         yield session
 
 
-async def client(config):
-    class _Client:
-        def __getattribute__(self, item):
-            return partial(request, method=item)
-
-    return _Client()
-
 ModelType = TypeVar('ModelType', bound=BaseModel)
+
+
+@pytest.fixture
+def fake() -> Faker:
+    """Faker."""
+    return Faker('ru-RU')
+
 
 class ModelGenerator:
     """Генерация данных по модели пидантика."""
 
-    def init(self, fake: Faker) -> None:
+    def __init__(self, fake: Faker) -> None:
 
         self.fake = fake
 
@@ -120,13 +120,13 @@ class ModelGenerator:
         for key, value in self.override.items():
             result[aliases.get(key, key)] = value
 
-    @contextmanager
-    def manager(
-        self,
-        schema: dict[str, Any],
-        override: dict[str, Any] | None,
-        include_optional: bool,
-    ) -> Generator[Self, Any, None]:
+    @contextmanager  # type: ignore
+    def manager(  # type: ignore
+            self,
+            schema: dict[str, Any],
+            override: dict[str, Any] | None,
+            include_optional: bool,
+    ) -> 'ModelGenerator':
         """Контекстный менеджер."""
         self.models = schema.get('$defs', {})
         self.override = override or {}
@@ -136,25 +136,26 @@ class ModelGenerator:
         self.override = {}
         self.include_optional = True
 
-    def call(
-        self,
-        model: ModelType,
-        override: dict[str, Any] | None = None,
-        include_optional: bool = True,
-        return_dict: bool = False,
+    def __call__(
+            self,
+            model: ModelType,
+            override: dict[str, Any] | None = None,
+            include_optional: bool = True,
+            return_dict: bool = False,
     ) -> ModelType:
         schema = model.model_json_schema(ref_template='{model}')
         with self.manager(schema, override, include_optional):
             result = self.parse(schema)
             if override:
                 self.apply_override_values(model, result)
-            return result if return_dict else model(**result)
+            return result if return_dict else model(**result)  # type: ignore
 
 
 @pytest.fixture
 def pydantic_generator_data(fake: Faker) -> ModelGenerator:
     """Генератор данных на основе пидантика."""
     return ModelGenerator(fake)
+
 
 
 @pytest.fixture

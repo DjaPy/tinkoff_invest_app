@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from beanie import Document
+from beanie import Document, PydanticObjectId
 from tinkoff.invest import AccessLevel, AccountStatus, AccountType
 
 

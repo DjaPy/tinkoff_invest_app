@@ -5,57 +5,30 @@ REST API endpoints for managing trading strategies.
 Following FastAPI patterns and RFC7807 error handling.
 """
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
-from src.algo_trading.adapters.models.strategy import (RiskControls,
-                                                       StrategyStatus,
-                                                       StrategyType,
-                                                       TradingStrategy)
+from src.algo_trading.adapters.models.strategy import RiskControls, StrategyStatus, StrategyType, TradingStrategy
+from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
+    CreateStrategyRequestSchema,
+    StrategyListResponseSchema,
+    UpdateStrategyRequestSchema,
+)
 
-strategies_router = APIRouter(prefix="/api/v1/strategies", tags=["Trading Strategies"])
-
-
-# ==================== REQUEST/RESPONSE SCHEMAS ====================
-
-
-class CreateStrategyRequest(BaseModel):
-    """Request schema for creating a new strategy."""
-
-    name: str = Field(min_length=1, max_length=100, description="Strategy name")
-    strategy_type: StrategyType = Field(description="Type of trading strategy")
-    parameters: dict = Field(description="Strategy-specific parameters")
-    risk_controls: RiskControls = Field(description="Risk management configuration")
-
-
-class UpdateStrategyRequest(BaseModel):
-    """Request schema for updating a strategy."""
-
-    name: str | None = Field(None, min_length=1, max_length=100, description="Strategy name")
-    parameters: dict | None = Field(None, description="Strategy-specific parameters")
-    risk_controls: RiskControls | None = Field(None, description="Risk management configuration")
-
-
-class StrategyListResponse(BaseModel):
-    """Response schema for listing strategies."""
-
-    strategies: list[TradingStrategy] = Field(description="List of trading strategies")
-    total: int = Field(ge=0, description="Total number of strategies")
-
-
-# ==================== ENDPOINTS ====================
+strategies_router = APIRouter(prefix='/api/v1/strategies', tags=['Trading Strategies'])
 
 
 @strategies_router.post(
-    "/",
+    '/',
     response_model=TradingStrategy,
     status_code=status.HTTP_201_CREATED,
-    summary="Create new trading strategy",
-    description="Create a new algorithmic trading strategy with configuration and risk controls",
+    summary='Create new trading strategy',
+    description='Create a new algorithmic trading strategy with configuration and risk controls',
 )
-async def create_strategy(request: CreateStrategyRequest) -> TradingStrategy:
+async def create_strategy(request: CreateStrategyRequestSchema) -> TradingStrategy:
     """
     Create a new trading strategy (T042).
 
@@ -77,7 +50,7 @@ async def create_strategy(request: CreateStrategyRequest) -> TradingStrategy:
         strategy_type=request.strategy_type,
         parameters=request.parameters,
         risk_controls=request.risk_controls,
-        created_by="test-user",  # TODO: Get from auth token
+        created_by='test-user',  # TODO: Get from auth token
     )
 
     # TODO: Save to database via repository
@@ -87,12 +60,12 @@ async def create_strategy(request: CreateStrategyRequest) -> TradingStrategy:
 
 
 @strategies_router.get(
-    "/",
-    response_model=StrategyListResponse,
-    summary="List all trading strategies",
-    description="Retrieve all trading strategies for the authenticated user",
+    '/',
+    response_model=StrategyListResponseSchema,
+    summary='List all trading strategies',
+    description='Retrieve all trading strategies for the authenticated user',
 )
-async def list_strategies() -> StrategyListResponse:
+async def list_strategies() -> StrategyListResponseSchema:
     """
     List all trading strategies (T043).
 
@@ -107,17 +80,14 @@ async def list_strategies() -> StrategyListResponse:
 
     strategies = await TradingStrategy.find_all().to_list()
 
-    return StrategyListResponse(
-        strategies=strategies,
-        total=len(strategies),
-    )
+    return StrategyListResponseSchema(strategies=strategies, total=len(strategies))
 
 
 @strategies_router.get(
-    "/{strategy_id}",
+    '/{strategy_id}',
     response_model=TradingStrategy,
-    summary="Get strategy details",
-    description="Retrieve detailed information about a specific trading strategy",
+    summary='Get strategy details',
+    description='Retrieve detailed information about a specific trading strategy',
 )
 async def get_strategy(strategy_id: UUID) -> TradingStrategy:
     """
@@ -136,24 +106,18 @@ async def get_strategy(strategy_id: UUID) -> TradingStrategy:
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     return strategy
 
 
 @strategies_router.put(
-    "/{strategy_id}",
+    '/{strategy_id}',
     response_model=TradingStrategy,
-    summary="Update trading strategy",
-    description="Update strategy configuration and risk controls",
+    summary='Update trading strategy',
+    description='Update strategy configuration and risk controls',
 )
-async def update_strategy(
-    strategy_id: UUID,
-    request: UpdateStrategyRequest,
-) -> TradingStrategy:
+async def update_strategy(strategy_id: UUID, request: UpdateStrategyRequestSchema) -> TradingStrategy:
     """
     Update existing strategy (T044).
 
@@ -172,10 +136,7 @@ async def update_strategy(
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # Update fields if provided
     if request.name is not None:
@@ -187,9 +148,7 @@ async def update_strategy(
     if request.risk_controls is not None:
         strategy.risk_controls = request.risk_controls
 
-    # Update timestamp
-    from datetime import datetime
-    strategy.updated_at = datetime.utcnow()
+    strategy.updated_at = datetime.now(UTC)
 
     # TODO: Save via repository
     await strategy.save()
@@ -198,10 +157,10 @@ async def update_strategy(
 
 
 @strategies_router.delete(
-    "/{strategy_id}",
+    '/{strategy_id}',
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete trading strategy",
-    description="Delete a trading strategy and all associated data",
+    summary='Delete trading strategy',
+    description='Delete a trading strategy and all associated data',
 )
 async def delete_strategy(strategy_id: UUID) -> None:
     """
@@ -218,16 +177,13 @@ async def delete_strategy(strategy_id: UUID) -> None:
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # Cannot delete active strategy
     if strategy.status == StrategyStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Cannot delete active strategy. Stop the strategy first.",
+            detail='Cannot delete active strategy. Stop the strategy first.',
         )
 
     # TODO: Delete via repository (cascade delete related data)
@@ -235,10 +191,10 @@ async def delete_strategy(strategy_id: UUID) -> None:
 
 
 @strategies_router.post(
-    "/{strategy_id}/start",
+    '/{strategy_id}/start',
     response_model=TradingStrategy,
-    summary="Start trading strategy",
-    description="Activate a trading strategy to begin automated execution",
+    summary='Start trading strategy',
+    description='Activate a trading strategy to begin automated execution',
 )
 async def start_strategy(strategy_id: UUID) -> TradingStrategy:
     """
@@ -258,19 +214,13 @@ async def start_strategy(strategy_id: UUID) -> TradingStrategy:
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # Validate state transition
     try:
         strategy.update_status(StrategyStatus.ACTIVE)
     except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=str(e),
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
     # TODO: Use StrategyManager service to start execution
     await strategy.save()
@@ -279,10 +229,10 @@ async def start_strategy(strategy_id: UUID) -> TradingStrategy:
 
 
 @strategies_router.post(
-    "/{strategy_id}/stop",
+    '/{strategy_id}/stop',
     response_model=TradingStrategy,
-    summary="Stop trading strategy",
-    description="Halt a trading strategy and close all open positions",
+    summary='Stop trading strategy',
+    description='Halt a trading strategy and close all open positions',
 )
 async def stop_strategy(strategy_id: UUID) -> TradingStrategy:
     """
@@ -301,10 +251,7 @@ async def stop_strategy(strategy_id: UUID) -> TradingStrategy:
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # TODO: Use StrategyManager service to stop execution and close positions
     strategy.update_status(StrategyStatus.STOPPED)
@@ -314,10 +261,10 @@ async def stop_strategy(strategy_id: UUID) -> TradingStrategy:
 
 
 @strategies_router.post(
-    "/{strategy_id}/pause",
+    '/{strategy_id}/pause',
     response_model=TradingStrategy,
-    summary="Pause trading strategy",
-    description="Temporarily halt strategy execution without closing positions",
+    summary='Pause trading strategy',
+    description='Temporarily halt strategy execution without closing positions',
 )
 async def pause_strategy(strategy_id: UUID) -> TradingStrategy:
     """
@@ -336,10 +283,7 @@ async def pause_strategy(strategy_id: UUID) -> TradingStrategy:
     strategy = await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     if not strategy:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Strategy {strategy_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # TODO: Use StrategyManager service to pause execution
     strategy.update_status(StrategyStatus.PAUSED)

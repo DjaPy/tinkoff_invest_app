@@ -40,9 +40,7 @@ class StrategyRepository:
         Returns:
             TradingStrategy or None if not found
         """
-        return await TradingStrategy.find_one(
-            TradingStrategy.strategy_id == strategy_id
-        )
+        return await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
 
     @staticmethod
     async def find_all(
@@ -66,14 +64,12 @@ class StrategyRepository:
         query = {}
 
         if created_by:
-            query["created_by"] = created_by
+            query['created_by'] = created_by
 
         if status:
-            query["status"] = status
+            query['status'] = status
 
-        strategies = await TradingStrategy.find(query).skip(offset).limit(limit).to_list()
-
-        return strategies
+        return await TradingStrategy.find(query).skip(offset).limit(limit).to_list()
 
     @staticmethod
     async def update(strategy: TradingStrategy) -> TradingStrategy:
@@ -111,10 +107,7 @@ class StrategyRepository:
         return True
 
     @staticmethod
-    async def count(
-        created_by: str | None = None,
-        status: StrategyStatus | None = None,
-    ) -> int:
+    async def count(created_by: str | None = None, status: StrategyStatus | None = None) -> int:
         """
         Count strategies matching filters.
 
@@ -128,13 +121,12 @@ class StrategyRepository:
         query = {}
 
         if created_by:
-            query["created_by"] = created_by
+            query['created_by'] = created_by
 
         if status:
-            query["status"] = status
+            query['status'] = status
 
-        count = await TradingStrategy.find(query).count()
-        return count
+        return await TradingStrategy.find(query).count()
 
     @staticmethod
     async def find_active_strategies(created_by: None | str = None) -> list[TradingStrategy]:
@@ -147,7 +139,4 @@ class StrategyRepository:
         Returns:
             List of active strategies
         """
-        return await StrategyRepository.find_all(
-            created_by=created_by,
-            status=StrategyStatus.ACTIVE,
-        )
+        return await StrategyRepository.find_all(created_by=created_by, status=StrategyStatus.ACTIVE)

@@ -8,31 +8,74 @@ package-mode = false
 
 
 [tool.ruff]
-# ignore error # noqa: UP006
-target-version = "py310"
+target-version = "py312"
 line-length = 120
-select = ["E", "F", "C", "W", "C90"]
+src = ["src", "tests"]
 
-[tool.ruff.mccabe]
-# Unlike Flake8, default to a complexity level of 10.
+#exclude = []
+lint.select = [
+    "E",  # pycodestile errors
+    "F",  # pyflakes
+    "PL", # pylint
+    "R",  # pycodestile errors
+    "C",  # flake8-comprehensions
+    "W",  # pycodestile warnings
+    "C90",  # complexity mccabe
+    "N",   # pep8-naming
+    "ANN", # Pytype annotations
+    "S",   # Bandit
+    "B",   # Bugbear
+    "COM", # Commas
+    "C4",  # Comprehensions
+    "ISC", # Implicit string concat
+    "PIE", # Unnecessary code
+    "T20", # Catch prints
+    "PYI", # validate pyi files
+    "RSE", # Checks raise statements
+    "RET", # Checks return statements
+    "SLF", # Self checks
+    "SIM", # Simplificator
+    "PTH", # Pathlib checks
+    "ERA", # Checks for commented out code
+    "RUF", # Specific to Ruff checks
+]
+lint.ignore = ["B008", "ANN401", "RUF001", "RUF002", "RUF003", "RUF012"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["PLR2004", "F841", "PLR0913", "S101", "ANN", "SLF001", "N802", "B"]
+
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
+[tool.ruff.format]
+quote-style = "single"
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint.pylint]
+max-args = 7
 
 [tool.mypy]
-plugins = "pydantic.mypy"
-
+follow_imports = "silent"
+strict_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+check_untyped_defs = true
+no_implicit_reexport = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+show_error_codes = true
+exclude = ["auditor"]
+plugins = ["pydantic.mypy"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+asyncio_mode = "auto"
 env_files = [".env", ".env.example"]
-filterwarnings = ["ignore::DeprecationWarning:distutils"]
-asyncio_mode="auto"
-
 
 [tool.poetry.dependencies]
 python = "^3.12"
-aiomisc = "^17.9.4"
+aiomisc = "^17.9.6"
 fastapi = "^0.119.0"
 aiohttp = "^3.13.0"
 tinkoff-investments = "^0.2.0b117"
@@ -42,7 +85,7 @@ opentelemetry-sdk = "^1.37.0"
 prometheus-client = "^0.23.1"
 instrumental = "^0.5.3"
 opentelemetry-instrumentation-fastapi = "^0.58b0"
-pydantic = {extras = ["dotenv"], version = "^2.12.0"}
+pydantic = {extras = ["dotenv"], version = "^2.12.3"}
 beanie = "^1.30.0"
 pydantic-settings = "^2.11.0"
 rstr = "^3.2.2"
@@ -53,14 +96,15 @@ pip = "^25.3"
 
 [tool.poetry.group.dev.dependencies]
 Faker = "^18.10.1"
-ruff = "^0.0.270"
+ruff = "^0.14.2"
 mypy = "^1.3.0"
 isort = "^5.12.0"
 bandit = "^1.7.5"
-pytest = "^7.4.0"
+pytest = "^8.4.2"
 pytest-asyncio = "^0.21.1"
 pip-audit = "^2.9.0"
 setuptools = "^78.1.0"
+aiomisc-pytest = "^1.3.4"
 
 [build-system]
 requires = ["poetry-core"]

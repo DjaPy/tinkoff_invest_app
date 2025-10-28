@@ -5,8 +5,7 @@ from os.path import join
 from ssl import SSLContext
 from typing import Any, Generic, Optional, Type, TypeVar
 
-from aiohttp import (ClientResponse, ClientSession, ClientTimeout, Fingerprint,
-                     MultipartWriter)
+from aiohttp import ClientResponse, ClientSession, ClientTimeout, Fingerprint, MultipartWriter
 from aiohttp.typedefs import StrOrURL
 from aiomisc import Service
 from pydantic import BaseModel
@@ -43,7 +42,7 @@ class BaseClient(Generic[ClientSettingsType, ErrorException]):
     async def _request(self, method: str, url: StrOrURL, **kwargs: Any) -> ClientResponse:
         return await self._session.request(method, url, **kwargs)
 
-    async def _send_request(
+    async def _send_request(  # noqa: PLR0913
         self,
         response_schema: Type[ResponseModel],
         path: Optional[str] = None,
@@ -53,9 +52,9 @@ class BaseClient(Generic[ClientSettingsType, ErrorException]):
         headers: Optional[dict[str, str]] = None,
         data: Optional[dict[str, Any] | MultipartWriter] = None,
         json: Optional[str | bytes] = None,
-        **kwargs: Optional[Any]
+        **kwargs: Optional[Any],
     ) -> ResponseModel:
-        url = url or self.url.with_path(join(self.url.path, path or ''))
+        url = url or self.url.with_path(join(self.url.path, path or ''))  # noqa: PTH118
         try:
             response: ClientResponse = await self._request(
                 method=method,
@@ -73,17 +72,14 @@ class BaseClient(Generic[ClientSettingsType, ErrorException]):
             return response_schema.parse_raw(await response.read())
 
         raise self._exception(
-            f'Error in request "{response.status}" method="{method}", url="{url}", body = {await response.text()}'
+            f'Error in request "{response.status}" method="{method}", url="{url}", body = {await response.text()}',
         )
 
 
 class ClientManagerService(Service):
     _map_clients: dict[str, BaseClient] = {}
 
-    def __init__(
-        self,
-        context_name: str = 'client_manager'
-    ) -> None:
+    def __init__(self, context_name: str = 'client_manager') -> None:
         super().__init__()
         self.context_name = context_name
 

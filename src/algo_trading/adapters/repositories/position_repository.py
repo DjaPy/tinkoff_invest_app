@@ -55,17 +55,16 @@ class PositionRepository:
             existing.updated_at = datetime.utcnow()
             await existing.save()
             return existing
-        else:
-            # Create new position
-            position = PortfolioPosition(
-                strategy_id=strategy_id,
-                instrument=instrument,
-                quantity=Decimal(str(quantity)),
-                average_price=average_price,
-                current_price=current_price,
-            )
-            await position.insert()
-            return position
+        # Create new position
+        position = PortfolioPosition(
+            strategy_id=strategy_id,
+            instrument=instrument,
+            quantity=Decimal(str(quantity)),
+            average_price=average_price,
+            current_price=current_price,
+        )
+        await position.insert()
+        return position
 
     async def find_by_id(self, position_id: UUID) -> PortfolioPosition | None:
         """
@@ -77,15 +76,9 @@ class PositionRepository:
         Returns:
             Position if found, None otherwise
         """
-        return await PortfolioPosition.find_one(
-            PortfolioPosition.position_id == position_id
-        )
+        return await PortfolioPosition.find_one(PortfolioPosition.position_id == position_id)
 
-    async def find_by_strategy(
-        self,
-        strategy_id: UUID,
-        include_closed: bool = False,
-    ) -> list[PortfolioPosition]:
+    async def find_by_strategy(self, strategy_id: UUID, include_closed: bool = False) -> list[PortfolioPosition]:
         """
         Find all positions for a strategy.
 
@@ -101,13 +94,9 @@ class PositionRepository:
         if not include_closed:
             query = query.find(PortfolioPosition.quantity != 0)
 
-        return await query.sort("instrument").to_list()
+        return await query.sort('instrument').to_list()
 
-    async def find_by_strategy_and_instrument(
-        self,
-        strategy_id: UUID,
-        instrument: str,
-    ) -> PortfolioPosition | None:
+    async def find_by_strategy_and_instrument(self, strategy_id: UUID, instrument: str) -> PortfolioPosition | None:
         """
         Find position for specific strategy and instrument.
 
@@ -123,11 +112,7 @@ class PositionRepository:
             PortfolioPosition.instrument == instrument,
         )
 
-    async def update_market_price(
-        self,
-        position_id: UUID,
-        new_price: Decimal,
-    ) -> PortfolioPosition:
+    async def update_market_price(self, position_id: UUID, new_price: Decimal) -> PortfolioPosition:
         """
         Update current market price for real-time P&L tracking.
 
@@ -143,7 +128,7 @@ class PositionRepository:
         """
         position = await self.find_by_id(position_id)
         if not position:
-            raise ValueError(f"Position {position_id} not found")
+            raise ValueError(f'Position {position_id} not found')
 
         position.current_price = new_price
         position.updated_at = datetime.utcnow()
@@ -151,10 +136,7 @@ class PositionRepository:
         await position.save()
         return position
 
-    async def update_market_prices_bulk(
-        self,
-        price_updates: dict[str, Decimal],
-    ) -> list[PortfolioPosition]:
+    async def update_market_prices_bulk(self, price_updates: dict[str, Decimal]) -> list[PortfolioPosition]:
         """
         Bulk update market prices for multiple instruments.
 
@@ -184,12 +166,7 @@ class PositionRepository:
 
         return updated_positions
 
-    async def adjust_position(
-        self,
-        position_id: UUID,
-        quantity_delta: int,
-        trade_price: Decimal,
-    ) -> PortfolioPosition:
+    async def adjust_position(self, position_id: UUID, quantity_delta: int, trade_price: Decimal) -> PortfolioPosition:
         """
         Adjust position quantity and recalculate average price.
 
@@ -209,7 +186,7 @@ class PositionRepository:
         """
         position = await self.find_by_id(position_id)
         if not position:
-            raise ValueError(f"Position {position_id} not found")
+            raise ValueError(f'Position {position_id} not found')
 
         old_quantity = position.quantity
         new_quantity = old_quantity + quantity_delta
@@ -217,26 +194,19 @@ class PositionRepository:
         # Recalculate average price
         if new_quantity == 0:
             # Position closed
-            position.quantity = Decimal("0")
-            position.realized_pnl += (
-                trade_price - position.average_price
-            ) * Decimal(str(abs(quantity_delta)))
-        elif (old_quantity > 0 and quantity_delta > 0) or (
-            old_quantity < 0 and quantity_delta < 0
-        ):
+            position.quantity = Decimal('0')
+            position.realized_pnl += (trade_price - position.average_price) * Decimal(str(abs(quantity_delta)))
+        elif (old_quantity > 0 and quantity_delta > 0) or (old_quantity < 0 and quantity_delta < 0):
             # Adding to existing position - recalculate average
-            total_cost = (
-                position.average_price * abs(old_quantity)
-                + trade_price * Decimal(str(abs(quantity_delta)))
-            )
+            total_cost = position.average_price * abs(old_quantity) + trade_price * Decimal(str(abs(quantity_delta)))
             position.average_price = total_cost / abs(new_quantity)
             position.quantity = Decimal(str(new_quantity))
         else:
             # Reducing position - realize P&L
             realized_qty = Decimal(str(min(abs(quantity_delta), abs(old_quantity))))
             position.realized_pnl += (
-                trade_price - position.average_price
-            ) * realized_qty * Decimal("-1" if old_quantity < 0 else "1")
+                (trade_price - position.average_price) * realized_qty * Decimal('-1' if old_quantity < 0 else '1')
+            )
             position.quantity = Decimal(str(new_quantity))
 
         position.updated_at = datetime.utcnow()
@@ -259,25 +229,22 @@ class PositionRepository:
         """
         position = await self.find_by_id(position_id)
         if not position:
-            raise ValueError(f"Position {position_id} not found")
+            raise ValueError(f'Position {position_id} not found')
 
         if position.quantity == 0:
-            raise ValueError(f"Position {position_id} is already closed")
+            raise ValueError(f'Position {position_id} is already closed')
 
         # Calculate final realized P&L
         final_pnl = (exit_price - position.average_price) * position.quantity
         position.realized_pnl += final_pnl
-        position.quantity = Decimal("0")
+        position.quantity = Decimal('0')
         position.current_price = exit_price
         position.updated_at = datetime.utcnow()
 
         await position.save()
         return position
 
-    async def get_portfolio_summary(
-        self,
-        strategy_id: UUID,
-    ) -> dict:
+    async def get_portfolio_summary(self, strategy_id: UUID) -> dict:
         """
         Get portfolio summary for a strategy.
 
@@ -295,9 +262,9 @@ class PositionRepository:
         """
         positions = await self.find_by_strategy(strategy_id, include_closed=False)
 
-        total_market_value = Decimal("0")
-        total_unrealized_pnl = Decimal("0")
-        total_realized_pnl = Decimal("0")
+        total_market_value = Decimal('0')
+        total_unrealized_pnl = Decimal('0')
+        total_realized_pnl = Decimal('0')
 
         for position in positions:
             total_market_value += position.market_value
@@ -305,18 +272,15 @@ class PositionRepository:
             total_realized_pnl += position.realized_pnl
 
         return {
-            "total_positions": len(positions),
-            "total_market_value": total_market_value,
-            "total_unrealized_pnl": total_unrealized_pnl,
-            "total_realized_pnl": total_realized_pnl,
-            "total_pnl": total_unrealized_pnl + total_realized_pnl,
-            "positions": positions,
+            'total_positions': len(positions),
+            'total_market_value': total_market_value,
+            'total_unrealized_pnl': total_unrealized_pnl,
+            'total_realized_pnl': total_realized_pnl,
+            'total_pnl': total_unrealized_pnl + total_realized_pnl,
+            'positions': positions,
         }
 
-    async def get_exposure_by_instrument(
-        self,
-        strategy_id: UUID,
-    ) -> dict[str, Decimal]:
+    async def get_exposure_by_instrument(self, strategy_id: UUID) -> dict[str, Decimal]:
         """
         Get portfolio exposure broken down by instrument.
 
@@ -334,11 +298,7 @@ class PositionRepository:
 
         return exposure
 
-    async def count(
-        self,
-        strategy_id: UUID | None = None,
-        include_closed: bool = False,
-    ) -> int:
+    async def count(self, strategy_id: UUID | None = None, include_closed: bool = False) -> int:
         """
         Count positions with optional filters.
 
@@ -352,8 +312,8 @@ class PositionRepository:
         query_filter: dict[str, Any] = {}
 
         if strategy_id:
-            query_filter["strategy_id"] = strategy_id
+            query_filter['strategy_id'] = strategy_id
         if not include_closed:
-            query_filter["quantity"] = {"$ne": 0}
+            query_filter['quantity'] = {'$ne': 0}
 
         return await PortfolioPosition.find(query_filter).count()

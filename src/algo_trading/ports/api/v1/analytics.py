@@ -10,108 +10,31 @@ from decimal import Decimal
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
 from src.algo_trading.adapters.models.metrics import PerformanceMetrics
-from src.algo_trading.adapters.models.strategy import (RiskControls,
-                                                       StrategyType)
+from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
+    BacktestRequestSchema,
+    BacktestResults,
+    DrawdownAnalysisResponseSchema,
+    MarketDataAnalyticsResponseSchema,
+    PortfolioSummaryResponseSchema,
+    TradeAnalyticsResponseSchema,
+)
 
-analytics_router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
-
-
-# ==================== REQUEST/RESPONSE SCHEMAS ====================
-
-
-class TradeAnalytics(BaseModel):
-    """Trade analytics response schema."""
-
-    strategy_id: str = Field(description="Strategy identifier")
-    period_start: datetime = Field(description="Analysis period start")
-    period_end: datetime = Field(description="Analysis period end")
-    total_trades: int = Field(ge=0, description="Total number of trades")
-    winning_trades: int = Field(ge=0, description="Number of profitable trades")
-    losing_trades: int = Field(ge=0, description="Number of losing trades")
-    avg_win: Decimal = Field(description="Average winning trade amount")
-    avg_loss: Decimal = Field(description="Average losing trade amount")
-    largest_win: Decimal = Field(description="Largest winning trade")
-    largest_loss: Decimal = Field(description="Largest losing trade")
-
-
-class DrawdownAnalysis(BaseModel):
-    """Drawdown analysis response schema."""
-
-    strategy_id: str = Field(description="Strategy identifier")
-    max_drawdown: Decimal = Field(le=0, description="Maximum drawdown percentage")
-    max_drawdown_duration: int = Field(ge=0, description="Longest drawdown duration in days")
-    current_drawdown: Decimal = Field(le=0, description="Current drawdown")
-    drawdown_periods: list[dict] = Field(default_factory=list, description="Historical drawdown periods")
-
-
-class PortfolioSummary(BaseModel):
-    """Portfolio summary response schema."""
-
-    total_value: Decimal = Field(ge=0, description="Total portfolio value")
-    total_pnl: Decimal = Field(description="Total P&L")
-    total_return: Decimal = Field(description="Total return percentage")
-    active_strategies: int = Field(ge=0, description="Number of active strategies")
-    total_trades: int = Field(ge=0, description="Total trades across all strategies")
-    win_rate: Decimal = Field(ge=0, le=1, description="Overall win rate")
-    sharpe_ratio: Decimal = Field(description="Portfolio Sharpe ratio")
-
-
-class MarketDataAnalytics(BaseModel):
-    """Market data analytics response schema."""
-
-    instrument: str = Field(description="Trading instrument")
-    timeframe: str = Field(description="Data timeframe")
-    data_points: list[dict] = Field(default_factory=list, description="OHLCV data points")
-    indicators: dict = Field(default_factory=dict, description="Technical indicators")
-    last_updated: datetime = Field(description="Last update timestamp")
-
-
-class BacktestRequest(BaseModel):
-    """Request schema for running a backtest."""
-
-    strategy_type: StrategyType = Field(description="Type of strategy to backtest")
-    parameters: dict = Field(description="Strategy parameters")
-    instruments: list[str] = Field(min_length=1, description="Trading instruments")
-    start_date: datetime = Field(description="Backtest start date")
-    end_date: datetime = Field(description="Backtest end date")
-    initial_capital: Decimal = Field(gt=0, description="Starting capital")
-    risk_controls: RiskControls = Field(description="Risk management parameters")
-
-
-class BacktestResults(BaseModel):
-    """Response schema for backtest results."""
-
-    backtest_id: str = Field(description="Unique backtest run identifier")
-    strategy_type: str = Field(description="Strategy type tested")
-    start_date: datetime = Field(description="Backtest period start")
-    end_date: datetime = Field(description="Backtest period end")
-    initial_capital: Decimal = Field(gt=0, description="Starting capital")
-    final_capital: Decimal = Field(gt=0, description="Ending capital")
-    total_return: Decimal = Field(description="Total return percentage")
-    sharpe_ratio: Decimal = Field(description="Sharpe ratio")
-    max_drawdown: Decimal = Field(le=0, description="Maximum drawdown")
-    win_rate: Decimal = Field(ge=0, le=1, description="Win rate")
-    total_trades: int = Field(ge=0, description="Number of trades executed")
-    profit_factor: Decimal = Field(ge=0, description="Profit factor")
-
-
-# ==================== ENDPOINTS ====================
+analytics_router = APIRouter(prefix='/api/v1/analytics', tags=['Analytics'])
 
 
 @analytics_router.get(
-    "/strategies/{strategy_id}/performance",
+    '/strategies/{strategy_id}/performance',
     response_model=PerformanceMetrics,
-    summary="Get strategy performance metrics",
-    description="Retrieve performance analytics for a specific trading strategy",
+    summary='Get strategy performance metrics',
+    description='Retrieve performance analytics for a specific trading strategy',
 )
 async def get_strategy_performance(
     strategy_id: UUID,
-    period: str | None = Query(None, description="Time period (1d, 1w, 1m, 3m, 1y, all, custom)"),
-    from_date: datetime | None = Query(None, description="Start date for custom period"),
-    to_date: datetime | None = Query(None, description="End date for custom period"),
+    period: str | None = Query(None, description='Time period (1d, 1w, 1m, 3m, 1y, all, custom)'),
+    from_date: datetime | None = Query(None, description='Start date for custom period'),
+    to_date: datetime | None = Query(None, description='End date for custom period'),
 ) -> PerformanceMetrics:
     """
     Get strategy performance metrics (T054).
@@ -134,48 +57,46 @@ async def get_strategy_performance(
     # For now, return mock data
 
     # Validate custom period parameters
-    if period == "custom" and (from_date is None or to_date is None):
+    if period == 'custom' and (from_date is None or to_date is None):
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="from_date and to_date are required when period=custom",
+            detail='from_date and to_date are required when period=custom',
         )
 
     # TODO: Check if strategy exists
     # TODO: Calculate performance metrics using domain logic
 
     # Mock response
-    metrics = PerformanceMetrics(
+    return PerformanceMetrics(
         strategy_id=strategy_id,
         period_start=from_date or datetime.utcnow(),
         period_end=to_date or datetime.utcnow(),
-        total_return=Decimal("0.15"),  # 15%
-        annualized_return=Decimal("0.20"),  # 20%
-        sharpe_ratio=Decimal("1.5"),
-        max_drawdown=Decimal("-0.10"),  # -10%
-        volatility=Decimal("0.12"),
-        win_rate=Decimal("0.65"),  # 65%
-        profit_factor=Decimal("2.5"),
+        total_return=Decimal('0.15'),  # 15%
+        annualized_return=Decimal('0.20'),  # 20%
+        sharpe_ratio=Decimal('1.5'),
+        max_drawdown=Decimal('-0.10'),  # -10%
+        volatility=Decimal('0.12'),
+        win_rate=Decimal('0.65'),  # 65%
+        profit_factor=Decimal('2.5'),
         trade_count=100,
     )
 
     # TODO: Save calculated metrics to database
-    # await metrics.insert()
-
-    return metrics
+    # await metrics.insert() # noqa: ERA001
 
 
 @analytics_router.get(
-    "/strategies/{strategy_id}/trades",
-    response_model=TradeAnalytics,
-    summary="Get strategy trade analytics",
-    description="Retrieve detailed trade analytics and statistics for a strategy",
+    '/strategies/{strategy_id}/trades',
+    response_model=TradeAnalyticsResponseSchema,
+    summary='Get strategy trade analytics',
+    description='Retrieve detailed trade analytics and statistics for a strategy',
 )
 async def get_strategy_trades(
     strategy_id: UUID,
-    period: str | None = Query(None, description="Time period for analytics"),
-    from_date: datetime | None = Query(None, description="Start date for custom period"),
-    to_date: datetime | None = Query(None, description="End date for custom period"),
-) -> TradeAnalytics:
+    period: str | None = Query(None, description='Time period for analytics'),
+    from_date: datetime | None = Query(None, description='Start date for custom period'),
+    to_date: datetime | None = Query(None, description='End date for custom period'),
+) -> TradeAnalyticsResponseSchema:
     """
     Get strategy trade analytics (T055).
 
@@ -194,30 +115,30 @@ async def get_strategy_trades(
     """
     # TODO: Implement actual trade analytics calculation
     # Mock response
-    return TradeAnalytics(
+    return TradeAnalyticsResponseSchema(
         strategy_id=str(strategy_id),
         period_start=from_date or datetime.utcnow(),
         period_end=to_date or datetime.utcnow(),
         total_trades=100,
         winning_trades=65,
         losing_trades=35,
-        avg_win=Decimal("150.50"),
-        avg_loss=Decimal("-80.25"),
-        largest_win=Decimal("500.00"),
-        largest_loss=Decimal("-200.00"),
+        avg_win=Decimal('150.50'),
+        avg_loss=Decimal('-80.25'),
+        largest_win=Decimal('500.00'),
+        largest_loss=Decimal('-200.00'),
     )
 
 
 @analytics_router.get(
-    "/strategies/{strategy_id}/drawdown",
-    response_model=DrawdownAnalysis,
-    summary="Get strategy drawdown analysis",
-    description="Retrieve drawdown periods and risk analysis for a strategy",
+    '/strategies/{strategy_id}/drawdown',
+    response_model=DrawdownAnalysisResponseSchema,
+    summary='Get strategy drawdown analysis',
+    description='Retrieve drawdown periods and risk analysis for a strategy',
 )
 async def get_strategy_drawdown(
     strategy_id: UUID,
-    period: str | None = Query(None, description="Time period for drawdown analysis"),
-) -> DrawdownAnalysis:
+    period: str | None = Query(None, description='Time period for drawdown analysis'),
+) -> DrawdownAnalysisResponseSchema:
     """
     Get strategy drawdown analysis (T056).
 
@@ -234,27 +155,27 @@ async def get_strategy_drawdown(
     """
     # TODO: Implement actual drawdown calculation
     # Mock response
-    return DrawdownAnalysis(
+    return DrawdownAnalysisResponseSchema(
         strategy_id=str(strategy_id),
-        max_drawdown=Decimal("-0.15"),  # -15%
+        max_drawdown=Decimal('-0.15'),  # -15%
         max_drawdown_duration=30,  # 30 days
-        current_drawdown=Decimal("-0.05"),  # -5%
+        current_drawdown=Decimal('-0.05'),  # -5%
         drawdown_periods=[
-            {"start": "2024-01-15", "end": "2024-02-14", "drawdown": -0.15},
-            {"start": "2024-03-01", "end": "2024-03-10", "drawdown": -0.08},
+            {'start': '2024-01-15', 'end': '2024-02-14', 'drawdown': -0.15},
+            {'start': '2024-03-01', 'end': '2024-03-10', 'drawdown': -0.08},
         ],
     )
 
 
 @analytics_router.get(
-    "/portfolio/summary",
-    response_model=PortfolioSummary,
-    summary="Get portfolio summary",
-    description="Retrieve overall portfolio performance across all strategies",
+    '/portfolio/summary',
+    response_model=PortfolioSummaryResponseSchema,
+    summary='Get portfolio summary',
+    description='Retrieve overall portfolio performance across all strategies',
 )
 async def get_portfolio_summary(
-    period: str | None = Query(None, description="Time period for analytics calculation"),
-) -> PortfolioSummary:
+    period: str | None = Query(None, description='Time period for analytics calculation'),
+) -> PortfolioSummaryResponseSchema:
     """
     Get portfolio summary (T057).
 
@@ -269,28 +190,28 @@ async def get_portfolio_summary(
     """
     # TODO: Implement actual portfolio aggregation
     # Mock response
-    return PortfolioSummary(
-        total_value=Decimal("150000.00"),
-        total_pnl=Decimal("15000.00"),
-        total_return=Decimal("0.10"),  # 10%
+    return PortfolioSummaryResponseSchema(
+        total_value=Decimal('150000.00'),
+        total_pnl=Decimal('15000.00'),
+        total_return=Decimal('0.10'),  # 10%
         active_strategies=3,
         total_trades=250,
-        win_rate=Decimal("0.62"),  # 62%
-        sharpe_ratio=Decimal("1.8"),
+        win_rate=Decimal('0.62'),  # 62%
+        sharpe_ratio=Decimal('1.8'),
     )
 
 
 @analytics_router.get(
-    "/market-data/{instrument}",
-    response_model=MarketDataAnalytics,
-    summary="Get market data analytics",
-    description="Retrieve market data and technical indicators for an instrument",
+    '/market-data/{instrument}',
+    response_model=MarketDataAnalyticsResponseSchema,
+    summary='Get market data analytics',
+    description='Retrieve market data and technical indicators for an instrument',
 )
 async def get_market_data(
     instrument: str,
-    timeframe: str | None = Query(None, description="Data timeframe (1m, 5m, 15m, 1h, 1d)"),
-    limit: int = Query(100, ge=1, le=1000, description="Maximum number of data points to return"),
-) -> MarketDataAnalytics:
+    timeframe: str | None = Query(None, description='Data timeframe (1m, 5m, 15m, 1h, 1d)'),
+    limit: int = Query(100, ge=1, le=1000, description='Maximum number of data points to return'),
+) -> MarketDataAnalyticsResponseSchema:
     """
     Get market data analytics (T058).
 
@@ -308,30 +229,30 @@ async def get_market_data(
     """
     # TODO: Implement actual market data fetching and indicator calculation
     # Mock response
-    return MarketDataAnalytics(
+    return MarketDataAnalyticsResponseSchema(
         instrument=instrument,
-        timeframe=timeframe or "1d",
+        timeframe=timeframe or '1d',
         data_points=[
-            {"timestamp": "2024-01-01", "open": 150.0, "high": 155.0, "low": 148.0, "close": 153.0, "volume": 1000000},
-            {"timestamp": "2024-01-02", "open": 153.0, "high": 157.0, "low": 152.0, "close": 156.0, "volume": 1200000},
+            {'timestamp': '2024-01-01', 'open': 150.0, 'high': 155.0, 'low': 148.0, 'close': 153.0, 'volume': 1000000},
+            {'timestamp': '2024-01-02', 'open': 153.0, 'high': 157.0, 'low': 152.0, 'close': 156.0, 'volume': 1200000},
         ],
         indicators={
-            "sma_20": 154.5,
-            "sma_50": 152.3,
-            "rsi_14": 65.2,
-            "macd": {"value": 2.1, "signal": 1.8, "histogram": 0.3},
+            'sma_20': 154.5,
+            'sma_50': 152.3,
+            'rsi_14': 65.2,
+            'macd': {'value': 2.1, 'signal': 1.8, 'histogram': 0.3},
         },
         last_updated=datetime.utcnow(),
     )
 
 
 @analytics_router.post(
-    "/backtest",
+    '/backtest',
     response_model=BacktestResults,
-    summary="Run strategy backtest",
-    description="Run historical backtest for a trading strategy configuration",
+    summary='Run strategy backtest',
+    description='Run historical backtest for a trading strategy configuration',
 )
-async def run_backtest(request: BacktestRequest) -> BacktestResults:
+async def run_backtest(request: BacktestRequestSchema) -> BacktestResults:
     """
     Run strategy backtest (T059).
 
@@ -348,18 +269,15 @@ async def run_backtest(request: BacktestRequest) -> BacktestResults:
     """
     # Validate date range
     if request.end_date <= request.start_date:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="end_date must be after start_date",
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='end_date must be after start_date')
 
     # TODO: Implement actual backtest using BacktestEngine service
     # Mock response
     backtest_id = str(uuid4())
 
     # Calculate mock returns
-    total_return = Decimal("0.25")  # 25% return
-    final_capital = request.initial_capital * (Decimal("1") + total_return)
+    total_return = Decimal('0.25')  # 25% return
+    final_capital = request.initial_capital * (Decimal('1') + total_return)
 
     return BacktestResults(
         backtest_id=backtest_id,
@@ -369,9 +287,9 @@ async def run_backtest(request: BacktestRequest) -> BacktestResults:
         initial_capital=request.initial_capital,
         final_capital=final_capital,
         total_return=total_return,
-        sharpe_ratio=Decimal("2.1"),
-        max_drawdown=Decimal("-0.12"),  # -12%
-        win_rate=Decimal("0.68"),  # 68%
+        sharpe_ratio=Decimal('2.1'),
+        max_drawdown=Decimal('-0.12'),  # -12%
+        win_rate=Decimal('0.68'),  # 68%
         total_trades=150,
-        profit_factor=Decimal("3.2"),
+        profit_factor=Decimal('3.2'),
     )

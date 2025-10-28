@@ -13,5 +13,5 @@ Features:
 - Market data integration
 """
 
-__version__ = "1.0.0"
-__author__ = "Tinkoff Invest App"
+__version__ = '1.0.0'
+__author__ = 'Tinkoff Invest App'

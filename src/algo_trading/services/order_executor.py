@@ -7,19 +7,20 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models import (OrderSide, OrderStatus,
-                                              OrderType, PortfolioPosition,
-                                              TradeOrder, TradingSession)
-from src.algo_trading.domain.risk.risk_evaluator import (OrderProposal,
-                                                         PositionRisk,
-                                                         RiskEvaluator,
-                                                         RiskLimits)
+from src.algo_trading.adapters.dto_models.order_dto import OrderDTO
+from src.algo_trading.adapters.models import (
+    OrderSide,
+    OrderStatus,
+    OrderType,
+    PortfolioPosition,
+    TradeOrder,
+    TradingSession,
+)
+from src.algo_trading.domain.risk.risk_evaluator import OrderProposal, PositionRisk, RiskEvaluator, RiskLimits
 
 
 class OrderExecutorError(Exception):
     """Order execution operation failed."""
-
-    pass
 
 
 class OrderExecutor:
@@ -29,7 +30,7 @@ class OrderExecutor:
     Handles pre-trade risk validation, order placement, and tracking.
     """
 
-    def __init__(self, risk_evaluator: RiskEvaluator | None = None):
+    def __init__(self, risk_evaluator: RiskEvaluator | None = None) -> None:
         """
         Initialize OrderExecutor.
 
@@ -40,13 +41,7 @@ class OrderExecutor:
 
     async def place_order(
         self,
-        strategy_id: UUID,
-        session_id: UUID,
-        instrument: str,
-        order_type: OrderType,
-        side: OrderSide,
-        quantity: Decimal,
-        price: Decimal | None = None,
+        order: OrderDTO,
         risk_limits: RiskLimits | None = None,
         current_risk: PositionRisk | None = None,
     ) -> TradeOrder:
@@ -54,13 +49,7 @@ class OrderExecutor:
         Place a new order with risk validation.
 
         Args:
-            strategy_id: Originating strategy
-            session_id: Trading session
-            instrument: Trading instrument
-            order_type: Order type (market, limit, etc.)
-            side: Buy or sell
-            quantity: Order quantity
-            price: Limit price (required for limit orders)
+            order: OrderDTO
             risk_limits: Risk control limits (if None, skip validation)
             current_risk: Current portfolio risk (if None, skip validation)
 
@@ -70,20 +59,25 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If risk validation fails or order invalid
         """
+        # Business rule validations
+        self._validate_order_params(order.instrument, order.quantity, order.order_type, order.limit_price)
+
         # Validate price for limit orders
-        if order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT}:
-            if price is None:
-                raise OrderExecutorError(f"{order_type} orders require a price")
+        if (
+            order.order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT}
+            and order.limit_price is None
+        ):
+            raise OrderExecutorError(f'{order.order_type} orders require a price')
 
         # Pre-trade risk validation
         if risk_limits and current_risk:
-            estimated_price = price if price else await self._get_market_price(instrument)
+            estimated_price = order.limit_price if order.limit_price else await self._get_market_price(order.instrument)
 
             order_proposal = OrderProposal(
-                instrument=instrument,
-                quantity=quantity,
+                instrument=order.instrument,
+                quantity=order.quantity,
                 estimated_price=estimated_price,
-                side=side.value,
+                side=order.side.value,
             )
 
             risk_result = self.risk_evaluator.evaluate_order(
@@ -93,34 +87,30 @@ class OrderExecutor:
             )
 
             if not risk_result.approved:
-                raise OrderExecutorError(f"Order rejected by risk controls: {risk_result.reason}")
+                raise OrderExecutorError(f'Order rejected by risk controls: {risk_result.reason}')
 
         # Create order
         order = TradeOrder(
-            strategy_id=strategy_id,
-            session_id=session_id,
-            instrument=instrument,
-            order_type=order_type,
-            side=side,
-            quantity=quantity,
-            price=price,
+            strategy_id=order.strategy_id,
+            session_id=order.session_id,
+            instrument=order.instrument,
+            order_type=order.order_type,
+            side=order.side,
+            quantity=order.quantity,
+            price=order.limit_price,
         )
 
         await order.insert()
 
         # Record order in session
-        session = await TradingSession.get(session_id)
+        session = await TradingSession.get(order.session_id)
         if session:
-            session.record_order("pending")
+            session.record_order('pending')
             await session.save()
 
         return order
 
-    async def submit_order(
-        self,
-        order_id: UUID,
-        external_order_id: str,
-    ) -> TradeOrder:
+    async def submit_order(self, order_id: UUID, external_order_id: str) -> TradeOrder:
         """
         Mark order as submitted to broker.
 
@@ -136,16 +126,13 @@ class OrderExecutor:
         """
         order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
         if not order:
-            raise OrderExecutorError(f"Order {order_id} not found")
+            raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
-            order.update_status(
-                OrderStatus.SUBMITTED,
-                external_order_id=external_order_id,
-            )
+            order.update_status(OrderStatus.SUBMITTED, external_order_id=external_order_id)
             await order.save()
         except ValueError as e:
-            raise OrderExecutorError(f"Failed to submit order: {e}")
+            raise OrderExecutorError(f'Failed to submit order: {e}') from e
 
         return order
 
@@ -154,7 +141,7 @@ class OrderExecutor:
         order_id: UUID,
         filled_price: Decimal,
         filled_quantity: Decimal,
-        commission: Decimal = Decimal("0"),
+        commission: Decimal = Decimal('0'),
     ) -> tuple[TradeOrder, PortfolioPosition | None]:
         """
         Mark order as filled and update portfolio position.
@@ -173,21 +160,13 @@ class OrderExecutor:
         """
         order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
         if not order:
-            raise OrderExecutorError(f"Order {order_id} not found")
+            raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
             # Determine final status
-            status = (
-                OrderStatus.FILLED
-                if filled_quantity == order.quantity
-                else OrderStatus.PARTIALLY_FILLED
-            )
+            status = OrderStatus.FILLED if filled_quantity == order.quantity else OrderStatus.PARTIALLY_FILLED
 
-            order.update_status(
-                status,
-                filled_price=filled_price,
-                filled_quantity=filled_quantity,
-            )
+            order.update_status(status, filled_price=filled_price, filled_quantity=filled_quantity)
             order.commission = commission
             await order.save()
 
@@ -197,14 +176,14 @@ class OrderExecutor:
             # Update session
             session = await TradingSession.get(order.session_id)
             if session:
-                session.record_order("filled")
+                session.record_order('filled')
                 session.add_commission(commission)
                 await session.save()
 
             return order, position
 
         except ValueError as e:
-            raise OrderExecutorError(f"Failed to fill order: {e}")
+            raise OrderExecutorError(f'Failed to fill order: {e}') from e
 
     async def cancel_order(self, order_id: UUID) -> TradeOrder:
         """
@@ -221,7 +200,7 @@ class OrderExecutor:
         """
         order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
         if not order:
-            raise OrderExecutorError(f"Order {order_id} not found")
+            raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
             order.update_status(OrderStatus.CANCELLED)
@@ -230,11 +209,11 @@ class OrderExecutor:
             # Update session
             session = await TradingSession.get(order.session_id)
             if session:
-                session.record_order("cancelled")
+                session.record_order('cancelled')
                 await session.save()
 
         except ValueError as e:
-            raise OrderExecutorError(f"Failed to cancel order: {e}")
+            raise OrderExecutorError(f'Failed to cancel order: {e}') from e
 
         return order
 
@@ -254,7 +233,7 @@ class OrderExecutor:
         """
         order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
         if not order:
-            raise OrderExecutorError(f"Order {order_id} not found")
+            raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
             order.update_status(OrderStatus.REJECTED)
@@ -263,11 +242,11 @@ class OrderExecutor:
             # Update session
             session = await TradingSession.get(order.session_id)
             if session:
-                session.record_order("rejected")
+                session.record_order('rejected')
                 await session.save()
 
         except ValueError as e:
-            raise OrderExecutorError(f"Failed to reject order: {e}")
+            raise OrderExecutorError(f'Failed to reject order: {e}') from e
 
         return order
 
@@ -286,7 +265,7 @@ class OrderExecutor:
         """
         order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
         if not order:
-            raise OrderExecutorError(f"Order {order_id} not found")
+            raise OrderExecutorError(f'Order {order_id} not found')
 
         return order
 
@@ -314,17 +293,15 @@ class OrderExecutor:
         query: dict[str, Any] = {}
 
         if strategy_id:
-            query["strategy_id"] = strategy_id
+            query['strategy_id'] = strategy_id
 
         if session_id:
-            query["session_id"] = session_id
+            query['session_id'] = session_id
 
         if status:
-            query["status"] = status
+            query['status'] = status
 
-        orders = await TradeOrder.find(query).skip(offset).limit(limit).to_list()
-
-        return orders
+        return await TradeOrder.find(query).skip(offset).limit(limit).to_list()
 
     async def _update_position(
         self,
@@ -384,4 +361,42 @@ class OrderExecutor:
         """
         # TODO: Integrate with MarketData service
         # For now, return placeholder
-        return Decimal("100.00")
+        return Decimal('100.00')
+
+    def _validate_order_params(
+        self,
+        instrument: str,
+        quantity: Decimal,
+        order_type: OrderType,
+        price: Decimal | None,
+    ) -> None:
+        """
+        Validate order parameters against business rules.
+
+        Args:
+            instrument: Trading instrument
+            quantity: Order quantity
+            order_type: Type of order
+            price: Limit price (if applicable)
+
+        Raises:
+            OrderExecutorError: If validation fails
+        """
+        if not instrument or not instrument.strip():
+            raise OrderExecutorError('Instrument cannot be empty')
+
+        if quantity <= 0:
+            raise OrderExecutorError(f'Quantity must be positive, got {quantity}')
+
+        if quantity < Decimal('1'):
+            raise OrderExecutorError(f'Quantity must be at least 1, got {quantity}')
+
+        if (
+            order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT}
+            and price is not None
+            and price <= 0
+        ):
+            raise OrderExecutorError(f'Price must be positive, got {price}')
+
+        if order_type == OrderType.MARKET and price is not None:
+            raise OrderExecutorError('Market orders cannot specify a price')

@@ -9,15 +9,10 @@ from src.sandbox.collections import SandboxAccount
 
 
 class MongoDBService(Service):
-
     _client: AgnosticClient
     _context_name: str
 
-    def __init__(
-        self,
-        settings: MongoDBSettings,
-        context_name: str = 'mongodb',
-    ) -> None:
+    def __init__(self, settings: MongoDBSettings, context_name: str = 'mongodb') -> None:
         super().__init__()
         self.settings = settings
         self._context_name = context_name
@@ -26,7 +21,7 @@ class MongoDBService(Service):
         self._client = AsyncIOMotorClient(str(self.settings.dsn))
         await init_beanie(
             database=self._client[self.settings.db_name],
-            document_models=[SandboxAccount, *BEANIE_MODELS],  # type: ignore
+            document_models=[SandboxAccount, *BEANIE_MODELS],
         )
         self.context[self._context_name] = self._client
 

@@ -2,14 +2,8 @@
 
 Concrete strategy algorithms following Strategy pattern.
 """
+from src.algo_trading.domain.strategies.base import StrategySignal, TradingStrategyBase
+from src.algo_trading.domain.strategies.mean_reversion import MeanReversionStrategy
+from src.algo_trading.domain.strategies.momentum import MomentumStrategy
 
-from .base import StrategySignal, TradingStrategyBase
-from .mean_reversion import MeanReversionStrategy
-from .momentum import MomentumStrategy
-
-__all__ = [
-    "TradingStrategyBase",
-    "StrategySignal",
-    "MomentumStrategy",
-    "MeanReversionStrategy",
-]
+__all__ = ['MeanReversionStrategy', 'MomentumStrategy', 'StrategySignal', 'TradingStrategyBase']

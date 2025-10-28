@@ -12,34 +12,21 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from src.algo_trading.adapters.models.position import PortfolioPosition
+from src.algo_trading.ports.api.v1.schemas.positions_schema import PositionListResponseSchema
 
-positions_router = APIRouter(prefix="/api/v1/positions", tags=["Portfolio"])
-
-
-# ==================== REQUEST/RESPONSE SCHEMAS ====================
-
-
-class PositionListResponse(BaseModel):
-    """Response schema for listing positions."""
-
-    positions: list[PortfolioPosition] = Field(description="List of portfolio positions")
-    total_value: Decimal = Field(ge=0, description="Total portfolio market value")
-    total_pnl: Decimal = Field(description="Total unrealized P&L")
-
-
-# ==================== ENDPOINTS ====================
+positions_router = APIRouter(prefix='/api/v1/positions', tags=['Portfolio'])
 
 
 @positions_router.get(
-    "/",
-    response_model=PositionListResponse,
-    summary="List portfolio positions",
-    description="Retrieve current portfolio positions across all strategies",
+    '/',
+    response_model=PositionListResponseSchema,
+    summary='List portfolio positions',
+    description='Retrieve current portfolio positions across all strategies',
 )
 async def list_positions(
-    strategy_id: UUID | None = Query(None, description="Filter positions by strategy ID"),
-    instrument: str | None = Query(None, description="Filter positions by instrument"),
-) -> PositionListResponse:
+    strategy_id: UUID | None = Query(None, description='Filter positions by strategy ID'),
+    instrument: str | None = Query(None, description='Filter positions by instrument'),
+) -> PositionListResponseSchema:
     """
     List portfolio positions with optional filtering (T052).
 
@@ -70,21 +57,19 @@ async def list_positions(
         positions = await PortfolioPosition.find_all().to_list()
 
     # Calculate totals
+    if len(positions) == 0:
+        return PositionListResponse(positions=[], total_value=Decimal('0'), total_pnl=Decimal('0'))
     total_value = sum(pos.market_value for pos in positions)
     total_pnl = sum(pos.unrealized_pnl for pos in positions)
 
-    return PositionListResponse(
-        positions=positions,
-        total_value=total_value,
-        total_pnl=total_pnl,
-    )
+    return PositionListResponseSchema(positions=positions, total_value=total_value, total_pnl=total_pnl)
 
 
 @positions_router.get(
-    "/{position_id}",
+    '/{position_id}',
     response_model=PortfolioPosition,
-    summary="Get position details",
-    description="Retrieve detailed information about a specific portfolio position",
+    summary='Get position details',
+    description='Retrieve detailed information about a specific portfolio position',
 )
 async def get_position(position_id: UUID) -> PortfolioPosition:
     """
@@ -103,9 +88,6 @@ async def get_position(position_id: UUID) -> PortfolioPosition:
     position = await PortfolioPosition.find_one(PortfolioPosition.position_id == position_id)
 
     if not position:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Position {position_id} not found",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Position {position_id} not found')
 
     return position

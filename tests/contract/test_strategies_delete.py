@@ -19,14 +19,14 @@ async def test_delete_strategy_removes_existing_strategy(client, config):
     strategy_id = uuid4()
 
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Contract assertions - 204 No Content on successful deletion
         assert response.status == status.HTTP_204_NO_CONTENT
         # 204 responses should not have content
         content = await response.text()
-        assert content == "" or content is None
+        assert content == '' or content is None
 
 
 @pytest.mark.asyncio
@@ -35,16 +35,16 @@ async def test_delete_strategy_not_found(client, config):
     non_existent_id = uuid4()
 
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{non_existent_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{non_existent_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_404_NOT_FOUND
         data = await response.json()
         # RFC7807 error format
-        assert "type" in data
-        assert "title" in data
-        assert "status" in data
-        assert data["status"] == 404
+        assert 'type' in data
+        assert 'title' in data
+        assert 'status' in data
+        assert data['status'] == 404
 
 
 @pytest.mark.asyncio
@@ -54,13 +54,13 @@ async def test_delete_strategy_unauthorized_without_token(client, config):
 
     # No Authorization header
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}",
-        headers={"Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        headers={'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
         data = await response.json()
-        assert data["status"] == 401
-        assert data["title"] == "Unauthorized"
+        assert data['status'] == 401
+        assert data['title'] == 'Unauthorized'
 
 
 @pytest.mark.asyncio
@@ -70,19 +70,19 @@ async def test_delete_active_strategy_returns_conflict(client, config):
     active_strategy_id = uuid4()
 
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{active_strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{active_strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Should return 409 Conflict if strategy is active
         if response.status == status.HTTP_409_CONFLICT:
             data = await response.json()
             # RFC7807 error format
-            assert "type" in data
-            assert "title" in data
-            assert "status" in data
-            assert data["status"] == 409
+            assert 'type' in data
+            assert 'title' in data
+            assert 'status' in data
+            assert data['status'] == 409
             # Error message should indicate strategy cannot be deleted
-            assert "active" in data.get("detail", "").lower() or "cannot delete" in data.get("detail", "").lower()
+            assert 'active' in data.get('detail', '').lower() or 'cannot delete' in data.get('detail', '').lower()
 
 
 @pytest.mark.asyncio
@@ -92,15 +92,15 @@ async def test_delete_strategy_idempotent(client, config):
 
     # First deletion
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         pass
 
     # Second deletion of same strategy
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Should return 404 since strategy no longer exists
         assert response.status == status.HTTP_404_NOT_FOUND
@@ -112,35 +112,28 @@ async def test_delete_strategy_handles_internal_error(client, config):
     strategy_id = uuid4()
 
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # If there's an internal error, it should follow RFC7807 format
         if response.status == status.HTTP_500_INTERNAL_SERVER_ERROR:
             data = await response.json()
-            assert "type" in data
-            assert "title" in data
-            assert "status" in data
-            assert data["status"] == 500
+            assert 'type' in data
+            assert 'title' in data
+            assert 'status' in data
+            assert data['status'] == 500
 
 
-@pytest.mark.parametrize(
-    "invalid_id",
-    [
-        "not-a-uuid",
-        "12345",
-        "invalid-format",
-    ],
-)
+@pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
 @pytest.mark.asyncio
 async def test_delete_strategy_invalid_uuid_format(client, config, invalid_id):
     """Test DELETE /api/v1/strategies/{strategy_id} validates UUID format"""
     async with client.delete(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies/{invalid_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{invalid_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Should return 400 or 422 for invalid UUID format
         assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
         data = await response.json()
-        assert "type" in data
-        assert "status" in data
+        assert 'type' in data
+        assert 'status' in data

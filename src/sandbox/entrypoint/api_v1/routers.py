@@ -1,4 +1,3 @@
 from fastapi import APIRouter
 
-invest_router = APIRouter(prefix="/api/v1")
-
+invest_router = APIRouter(prefix='/api/v1')

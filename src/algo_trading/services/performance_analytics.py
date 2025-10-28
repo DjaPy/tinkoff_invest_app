@@ -8,17 +8,12 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models import (OrderSide, OrderStatus,
-                                              PerformanceMetrics, TradeOrder,
-                                              TradingSession)
-from src.algo_trading.domain.analytics.performance_calculator import (
-    PerformanceCalculator, Trade)
+from src.algo_trading.adapters.models import OrderSide, OrderStatus, PerformanceMetrics, TradeOrder, TradingSession
+from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, Trade
 
 
 class PerformanceAnalyticsError(Exception):
     """Performance analytics operation failed."""
-
-    pass
 
 
 class PerformanceAnalytics:
@@ -28,7 +23,7 @@ class PerformanceAnalytics:
     Orchestrates domain logic for analytics and persists results.
     """
 
-    def __init__(self, calculator: PerformanceCalculator | None = None):
+    def __init__(self, calculator: PerformanceCalculator | None = None) -> None:
         """
         Initialize PerformanceAnalytics.
 
@@ -58,7 +53,7 @@ class PerformanceAnalytics:
             PerformanceAnalyticsError: If calculation fails
         """
         if period_end <= period_start:
-            raise PerformanceAnalyticsError("period_end must be after period_start")
+            raise PerformanceAnalyticsError('period_end must be after period_start')
 
         # Get sessions in period
         sessions = await TradingSession.find(
@@ -68,9 +63,7 @@ class PerformanceAnalytics:
         ).to_list()
 
         if not sessions:
-            raise PerformanceAnalyticsError(
-                f"No trading sessions found for strategy {strategy_id} in period"
-            )
+            raise PerformanceAnalyticsError(f'No trading sessions found for strategy {strategy_id} in period')
 
         # Calculate capital and returns
         starting_capital = sessions[0].starting_capital
@@ -86,12 +79,10 @@ class PerformanceAnalytics:
         ).to_list()
 
         if not orders:
-            raise PerformanceAnalyticsError("No filled orders found in period")
+            raise PerformanceAnalyticsError('No filled orders found in period')
 
         # Build equity curve and returns
-        equity_curve, daily_returns = await self._build_equity_curve(
-            orders, starting_capital
-        )
+        equity_curve, daily_returns = await self._build_equity_curve(orders, starting_capital)
 
         # Build trade list
         trades = await self._build_trade_list(orders)
@@ -132,10 +123,7 @@ class PerformanceAnalytics:
 
         return metrics
 
-    async def get_latest_metrics(
-        self,
-        strategy_id: UUID,
-    ) -> PerformanceMetrics | None:
+    async def get_latest_metrics(self, strategy_id: UUID) -> PerformanceMetrics | None:
         """
         Get most recent performance metrics for strategy.
 
@@ -145,17 +133,16 @@ class PerformanceAnalytics:
         Returns:
             Latest PerformanceMetrics or None
         """
-        metrics = await PerformanceMetrics.find(
-            PerformanceMetrics.strategy_id == strategy_id
-        ).sort('-period_end').limit(1).to_list()
+        metrics = (
+            await PerformanceMetrics.find(PerformanceMetrics.strategy_id == strategy_id)
+            .sort('-period_end')
+            .limit(1)
+            .to_list()
+        )
 
         return metrics[0] if metrics else None
 
-    async def get_metrics_history(
-        self,
-        strategy_id: UUID,
-        limit: int = 30,
-    ) -> list[PerformanceMetrics]:
+    async def get_metrics_history(self, strategy_id: UUID, limit: int = 30) -> list[PerformanceMetrics]:
         """
         Get performance metrics history for strategy.
 
@@ -166,17 +153,14 @@ class PerformanceAnalytics:
         Returns:
             List of PerformanceMetrics (newest first)
         """
-        metrics = await PerformanceMetrics.find(
-            PerformanceMetrics.strategy_id == strategy_id
-        ).sort('-period_end').limit(limit).to_list()
+        return (
+            await PerformanceMetrics.find(PerformanceMetrics.strategy_id == strategy_id)
+            .sort('-period_end')
+            .limit(limit)
+            .to_list()
+        )
 
-        return metrics
-
-    async def calculate_trailing_metrics(
-        self,
-        strategy_id: UUID,
-        days: int = 30,
-    ) -> PerformanceMetrics:
+    async def calculate_trailing_metrics(self, strategy_id: UUID, days: int = 30) -> PerformanceMetrics:
         """
         Calculate trailing N-day performance metrics.
 
@@ -198,7 +182,7 @@ class PerformanceAnalytics:
 
     @classmethod
     def get_daily_return(cls, daily_pnl: Decimal, current_capital: Decimal) -> Decimal:
-        return daily_pnl / (current_capital - daily_pnl) if (current_capital - daily_pnl) > 0 else Decimal("0")
+        return daily_pnl / (current_capital - daily_pnl) if (current_capital - daily_pnl) > 0 else Decimal('0')
 
     async def _build_equity_curve(
         self,
@@ -224,7 +208,7 @@ class PerformanceAnalytics:
         orders_by_day: dict[str, list[TradeOrder]] = {}
         sorted_order = sorted(
             [o for o in orders if o.filled_at is not None],
-            key=lambda o: o.filled_at if o.filled_at else datetime.min
+            key=lambda o: o.filled_at if o.filled_at else datetime.min,
         )
         for order in sorted_order:
             if order.filled_at is None:
@@ -236,7 +220,7 @@ class PerformanceAnalytics:
 
         # Calculate daily P&L
         for day_orders in orders_by_day.values():
-            daily_pnl = Decimal("0")
+            daily_pnl = Decimal('0')
 
             for order in day_orders:
                 # Simplified P&L calculation
@@ -255,10 +239,7 @@ class PerformanceAnalytics:
 
         return equity_curve, daily_returns
 
-    async def _build_trade_list(
-        self,
-        orders: list[TradeOrder],
-    ) -> list[Trade]:
+    async def _build_trade_list(self, orders: list[TradeOrder]) -> list[Trade]:
         """
         Build trade list from orders for performance calculation.
 
@@ -272,10 +253,10 @@ class PerformanceAnalytics:
 
         # Group buy/sell pairs (simplified)
         # Real implementation would match specific positions
-        for order in orders:
+        for _order in orders:
             # Calculate P&L (simplified)
-            pnl = Decimal("0")  # Would calculate from matched positions
-            return_pct = Decimal("0")  # Would calculate from matched positions
+            pnl = Decimal('0')  # Would calculate from matched positions
+            return_pct = Decimal('0')  # Would calculate from matched positions
 
             trade = Trade(pnl=pnl, return_pct=return_pct)
             trades.append(trade)
@@ -299,41 +280,41 @@ class PerformanceAnalytics:
         Returns:
             Dictionary with trade analytics
         """
-        query: dict[str, Any] = {"strategy_id": strategy_id, "status": OrderStatus.FILLED}
+        query: dict[str, Any] = {'strategy_id': strategy_id, 'status': OrderStatus.FILLED}
 
         if period_start:
-            query["filled_at"] = {"$gte": period_start}
+            query['filled_at'] = {'$gte': period_start}
 
         if period_end:
-            if "filled_at" in query:
-                filled_at_query = query["filled_at"]
+            if 'filled_at' in query:
+                filled_at_query = query['filled_at']
                 if isinstance(filled_at_query, dict):
-                    filled_at_query["$lte"] = period_end
+                    filled_at_query['$lte'] = period_end
             else:
-                query["filled_at"] = {"$lte": period_end}
+                query['filled_at'] = {'$lte': period_end}
 
         orders = await TradeOrder.find(query).to_list()
 
         if not orders:
             return {
-                "total_trades": 0,
-                "total_volume": Decimal("0"),
-                "total_commission": Decimal("0"),
-                "average_fill_price": Decimal("0"),
+                'total_trades': 0,
+                'total_volume': Decimal('0'),
+                'total_commission': Decimal('0'),
+                'average_fill_price': Decimal('0'),
             }
 
         total_trades = len(orders)
         total_volume = sum(o.filled_quantity for o in orders)
         total_commission = sum(o.commission for o in orders)
         filled_prices = [o.filled_price for o in orders if o.filled_price is not None]
-        average_fill_price = Decimal("0")
+        average_fill_price = Decimal('0')
         if filled_prices:
-            average_fill_price = sum(filled_prices, Decimal("0")) / len(filled_prices)
+            average_fill_price = sum(filled_prices, Decimal('0')) / len(filled_prices)
 
         return {
-            "total_trades": total_trades,
-            "total_volume": total_volume,
-            "total_commission": total_commission,
-            "average_fill_price": average_fill_price,
-            "orders": orders,
+            'total_trades': total_trades,
+            'total_volume': total_volume,
+            'total_commission': total_commission,
+            'average_fill_price': average_fill_price,
+            'orders': orders,
         }

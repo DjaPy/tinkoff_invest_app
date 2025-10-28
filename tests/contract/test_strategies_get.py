@@ -11,16 +11,14 @@ import pytest
 from pydantic import BaseModel, Field, ValidationError
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import (StrategyStatus,
-                                                       StrategyType,
-                                                       TradingStrategy)
+from src.algo_trading.adapters.models.strategy import StrategyStatus, StrategyType, TradingStrategy
 
 
 class StrategyListResponse(BaseModel):
     """Response schema for GET /api/v1/strategies."""
 
-    strategies: list[TradingStrategy] = Field(description="List of trading strategies")
-    total: int = Field(ge=0, description="Total number of strategies")
+    strategies: list[TradingStrategy] = Field(description='List of trading strategies')
+    total: int = Field(ge=0, description='Total number of strategies')
 
 
 @pytest.mark.asyncio
@@ -28,12 +26,12 @@ async def test_get_strategies_returns_strategy_list(client, config):
     """Test GET /api/v1/strategies returns list of strategies"""
     # This test is designed to FAIL until implementation
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Contract assertions based on trading_strategies_api.yaml
         assert response.status == status.HTTP_200_OK
-        assert "application/json" in response.headers["content-type"]
+        assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
@@ -48,8 +46,8 @@ async def test_get_strategies_returns_strategy_list(client, config):
 async def test_get_strategies_validates_strategy_structure(client, config, pydantic_generator_data):
     """Test GET /api/v1/strategies returns strategies with correct Pydantic structure"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -87,8 +85,8 @@ async def test_get_strategies_validates_strategy_structure(client, config, pydan
 async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection):
     """Test GET /api/v1/strategies returns empty list when no strategies"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -103,24 +101,24 @@ async def test_get_strategies_unauthorized_without_token(client, config):
     """Test GET /api/v1/strategies requires authentication (401)"""
     # No Authorization header
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
         data = await response.json()
         # RFC7807 error format
-        assert "type" in data
-        assert "title" in data
-        assert "status" in data
-        assert data["status"] == 401
+        assert 'type' in data
+        assert 'title' in data
+        assert 'status' in data
+        assert data['status'] == 401
 
 
 @pytest.mark.asyncio
 async def test_get_strategies_validates_pydantic_model(client, config, pydantic_generator_data):
     """Test GET /api/v1/strategies response validates against Pydantic model"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -131,7 +129,7 @@ async def test_get_strategies_validates_pydantic_model(client, config, pydantic_
             # Verify count matches
             assert len(response_model.strategies) == response_model.total
         except ValidationError as e:
-            pytest.fail(f"Response validation failed: {e}")
+            pytest.fail(f'Response validation failed: {e}')
 
 
 @pytest.mark.asyncio
@@ -139,13 +137,13 @@ async def test_get_strategies_handles_internal_errors(client, config):
     """Test GET /api/v1/strategies handles internal server errors (500)"""
     # This will test error handling when implemented
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/strategies",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # If there's an internal error, it should follow RFC7807 format
         if response.status == status.HTTP_500_INTERNAL_SERVER_ERROR:
             data = await response.json()
-            assert "type" in data
-            assert "title" in data
-            assert "status" in data
-            assert data["status"] == 500
+            assert 'type' in data
+            assert 'title' in data
+            assert 'status' in data
+            assert data['status'] == 500

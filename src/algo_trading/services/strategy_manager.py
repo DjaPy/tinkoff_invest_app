@@ -3,22 +3,25 @@
 Orchestrates strategy lifecycle: create, start, pause, stop, delete.
 """
 
+import logging
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models import (StrategyStatus, TradingSession,
-                                              TradingStrategy)
-from src.algo_trading.adapters.repositories.strategy_repository import \
-    StrategyRepository
+from src.algo_trading.adapters.models import RiskControls, StrategyStatus, StrategyType, TradingSession, TradingStrategy
+from src.algo_trading.adapters.repositories.strategy_repository import StrategyRepository
 from src.algo_trading.domain.risk.risk_evaluator import RiskLimits
+
+logger = logging.getLogger(__name__)
 
 
 class StrategyManagerError(Exception):
     """Strategy management operation failed."""
 
-    pass
+
+LifecycleHook = Callable[[TradingStrategy], Awaitable[None]]
 
 
 class StrategyManager:
@@ -28,7 +31,7 @@ class StrategyManager:
     Orchestrates domain logic, repository access, and business rules.
     """
 
-    def __init__(self, strategy_repo: StrategyRepository):
+    def __init__(self, strategy_repo: StrategyRepository) -> None:
         """
         Initialize StrategyManager.
 
@@ -36,11 +39,46 @@ class StrategyManager:
             strategy_repo: Repository for strategy persistence
         """
         self.strategy_repo = strategy_repo
+        self._on_create_hooks: list[LifecycleHook] = []
+        self._on_start_hooks: list[LifecycleHook] = []
+        self._on_pause_hooks: list[LifecycleHook] = []
+        self._on_stop_hooks: list[LifecycleHook] = []
+        self._on_delete_hooks: list[LifecycleHook] = []
+
+    def on_create(self, hook: LifecycleHook) -> None:
+        """Register hook to be called when strategy is created."""
+        self._on_create_hooks.append(hook)
+
+    def on_start(self, hook: LifecycleHook) -> None:
+        """Register hook to be called when strategy is started."""
+        self._on_start_hooks.append(hook)
+
+    def on_pause(self, hook: LifecycleHook) -> None:
+        """Register hook to be called when strategy is paused."""
+        self._on_pause_hooks.append(hook)
+
+    def on_stop(self, hook: LifecycleHook) -> None:
+        """Register hook to be called when strategy is stopped."""
+        self._on_stop_hooks.append(hook)
+
+    def on_delete(self, hook: LifecycleHook) -> None:
+        """Register hook to be called when strategy is deleted."""
+        self._on_delete_hooks.append(hook)
+
+    async def _execute_hooks(self, hooks: list[LifecycleHook], strategy: TradingStrategy) -> None:
+        """Execute all registered hooks for a lifecycle event."""
+        for hook in hooks:
+            try:
+                await hook(strategy)
+            except Exception as err_hook:
+                # Log but don't fail the operation
+                # In production, use proper logging
+                logger.error(f'Hook execution failed: {err_hook}')
 
     async def create_strategy(
         self,
         name: str,
-        strategy_type: str,
+        strategy_type: StrategyType,
         parameters: dict,
         risk_controls: dict,
         created_by: str,
@@ -61,13 +99,9 @@ class StrategyManager:
         Raises:
             StrategyManagerError: If validation fails
         """
-        # Validate uniqueness (name per user)
         existing = await self.strategy_repo.find_all(created_by=created_by)
         if any(s.name == name for s in existing):
             raise StrategyManagerError(f"Strategy '{name}' already exists for user {created_by}")
-
-        # Create strategy model
-        from ..adapters.models.strategy import RiskControls
 
         risk_controls_model = RiskControls(**risk_controls)
 
@@ -79,8 +113,9 @@ class StrategyManager:
             created_by=created_by,
         )
 
-        # Persist
         await self.strategy_repo.create(strategy)
+
+        await self._execute_hooks(self._on_create_hooks, strategy)
 
         return strategy
 
@@ -99,7 +134,7 @@ class StrategyManager:
         """
         strategy = await self.strategy_repo.find_by_id(strategy_id)
         if not strategy:
-            raise StrategyManagerError(f"Strategy {strategy_id} not found")
+            raise StrategyManagerError(f'Strategy {strategy_id} not found')
 
         return strategy
 
@@ -122,12 +157,7 @@ class StrategyManager:
         Returns:
             Tuple of (strategies, total_count)
         """
-        strategies = await self.strategy_repo.find_all(
-            created_by=created_by,
-            status=status,
-            limit=limit,
-            offset=offset,
-        )
+        strategies = await self.strategy_repo.find_all(created_by=created_by, status=status, limit=limit, offset=offset)
 
         total = await self.strategy_repo.count(created_by=created_by, status=status)
 
@@ -157,14 +187,12 @@ class StrategyManager:
 
         # Cannot update active strategy
         if strategy.status == StrategyStatus.ACTIVE:
-            raise StrategyManagerError("Cannot update active strategy. Pause or stop it first.")
+            raise StrategyManagerError('Cannot update active strategy. Pause or stop it first.')
 
         if parameters is not None:
             strategy.parameters = parameters
 
         if risk_controls is not None:
-            from ..adapters.models.strategy import RiskControls
-
             strategy.risk_controls = RiskControls(**risk_controls)
 
         strategy.updated_at = datetime.utcnow()
@@ -196,20 +224,16 @@ class StrategyManager:
         # Validate status transition
         if not strategy.can_transition_to(StrategyStatus.ACTIVE):
             raise StrategyManagerError(
-                f"Cannot start strategy in {strategy.status} status. "
-                f"Must be INACTIVE or PAUSED."
+                f'Cannot start strategy in {strategy.status} status. Must be INACTIVE or PAUSED.',
             )
 
-        # Create trading session
-        session = TradingSession(
-            strategy_id=strategy.strategy_id,
-            starting_capital=starting_capital,
-        )
+        session = TradingSession(strategy_id=strategy.strategy_id, starting_capital=starting_capital)
         await session.insert()
 
-        # Update strategy status
         strategy.update_status(StrategyStatus.ACTIVE)
         await self.strategy_repo.update(strategy)
+
+        await self._execute_hooks(self._on_start_hooks, strategy)
 
         return strategy, session
 
@@ -229,20 +253,16 @@ class StrategyManager:
         strategy = await self.get_strategy(strategy_id)
 
         if not strategy.can_transition_to(StrategyStatus.PAUSED):
-            raise StrategyManagerError(
-                f"Cannot pause strategy in {strategy.status} status. Must be ACTIVE."
-            )
+            raise StrategyManagerError(f'Cannot pause strategy in {strategy.status} status. Must be ACTIVE.')
 
         strategy.update_status(StrategyStatus.PAUSED)
         await self.strategy_repo.update(strategy)
 
+        await self._execute_hooks(self._on_pause_hooks, strategy)
+
         return strategy
 
-    async def stop_strategy(
-        self,
-        strategy_id: UUID,
-        ending_capital: Decimal,
-    ) -> tuple[TradingStrategy, TradingSession]:
+    async def stop_strategy(self, strategy_id: UUID, ending_capital: Decimal) -> tuple[TradingStrategy, TradingSession]:
         """
         Stop strategy execution (close positions, end session).
 
@@ -259,10 +279,7 @@ class StrategyManager:
         strategy = await self.get_strategy(strategy_id)
 
         if not strategy.can_transition_to(StrategyStatus.STOPPED):
-            raise StrategyManagerError(
-                f"Cannot stop strategy in {strategy.status} status. "
-                f"Must be ACTIVE or PAUSED."
-            )
+            raise StrategyManagerError(f'Cannot stop strategy in {strategy.status} status. Must be ACTIVE or PAUSED.')
 
         # Find active session
         active_session = await TradingSession.find_one(
@@ -271,15 +288,15 @@ class StrategyManager:
         )
 
         if not active_session:
-            raise StrategyManagerError(f"No active session found for strategy {strategy_id}")
+            raise StrategyManagerError(f'No active session found for strategy {strategy_id}')
 
-        # End session
         active_session.end_session(ending_capital)
         await active_session.save()
 
-        # Update strategy status
         strategy.update_status(StrategyStatus.STOPPED)
         await self.strategy_repo.update(strategy)
+
+        await self._execute_hooks(self._on_stop_hooks, strategy)
 
         return strategy, active_session
 
@@ -298,9 +315,10 @@ class StrategyManager:
         """
         strategy = await self.get_strategy(strategy_id)
 
-        # Cannot delete active strategy
         if strategy.status == StrategyStatus.ACTIVE:
-            raise StrategyManagerError("Cannot delete active strategy. Stop it first.")
+            raise StrategyManagerError('Cannot delete active strategy. Stop it first.')
+
+        await self._execute_hooks(self._on_delete_hooks, strategy)
 
         return await self.strategy_repo.delete(strategy_id)
 

@@ -1,14 +1,16 @@
 import asyncio
+import io
 import time
 import traceback
 from functools import partial
 from http import HTTPStatus
 from typing import Any, Awaitable, Callable, Coroutine, Optional, Type
 
+import yaml
 from aiomisc import Service
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.routing import APIRoute
+from fastapi.routing import APIRoute, APIRouter
 from opentelemetry import trace
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from prometheus_client import Counter, Gauge, Histogram
@@ -20,12 +22,14 @@ from uvicorn.config import Config
 from . import FastAPISettings
 from .problem import Problem, ProblemResponse
 from .uvicorn_server import Server
+from ..consts import FASTAPI
 
 ExceptionHandlerType = Callable[[Request, Any], Coroutine[Any, Any, Response]]
 ExceptionHandlerMethodType = Callable[['FastAPIService', Request, Any], Coroutine[Any, Any, Response]]
 
 
 class FastAPIService(Service):
+    openapi_yaml_url = '/openapi.yaml'
 
     HTTP_PANIC_RECOVERY_TOTAL = Counter(
         'http_panic_recovery_total',
@@ -36,7 +40,7 @@ class FastAPIService(Service):
         'http_request_duration_seconds',
         'The latency of the HTTP requests.',
         ['http_service', 'http_handler', 'http_method', 'http_code'],
-        buckets=[.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10]
+        buckets=[.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10],
     )
     HTTP_REQUESTS_INFLIGHT = Gauge(
         'http_requests_inflight',
@@ -47,7 +51,7 @@ class FastAPIService(Service):
         'http_response_size_bytes',
         'The size of the HTTP responses.',
         ['http_service', 'http_handler', 'http_method', 'http_code'],
-        buckets=[100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000, 1_000_000_000]
+        buckets=[100, 1_000, 10_000, 100_000, 1_000_000, 10_000_000, 100_000_000, 1_000_000_000],
     )
 
     # RFC7807 Problem Details for HTTP APIs https://datatracker.ietf.org/doc/html/rfc7807
@@ -65,9 +69,9 @@ class FastAPIService(Service):
         return ProblemResponse(content=problem)
 
     async def validation_exception_handler_by_default(
-        self,
-        request: Request,
-        exc: RequestValidationError
+            self,
+            request: Request,
+            exc: RequestValidationError,
     ) -> ProblemResponse:
         status_ = HTTPStatus.BAD_REQUEST
         problem = Problem(title=status_.phrase, status=status_, instance=request.url.path,
@@ -81,36 +85,57 @@ class FastAPIService(Service):
     }
 
     def __init__(
-        self,
-        settings: FastAPISettings,
-        context_name: str = 'fastapi',
-        app_name: str = ''
+            self,
+            settings: FastAPISettings,
+            routers: list[APIRouter],
+            context_name: str = FASTAPI,
+            app_name: str = '',
+            version: str = '0.0.1',
     ) -> None:
         super().__init__()
         self._settings = settings
         self._app_name = app_name
         self._context_name = context_name
-        self.__fastapi: FastAPI | None = None
+        self._version = version
+        self.__fastapi = FastAPI(title=self._app_name, version=self._version)
         self.__task: Awaitable[Any] | None = None
         self.__server_main: Server | None = None
 
+        self._add_routers(routers)
+        if self._settings.openapi_yaml_url:
+            self._add_openapi_yaml(self._settings.openapi_yaml_url)
+
+    def _add_routers(self, routers: list[APIRouter]) -> None:
+        self._routers = routers
+        for router in self._routers:
+            self.__fastapi.include_router(router)
+
+    def _add_openapi_yaml(self, path: str) -> None:
+        self.__fastapi.add_route(path, self.openapi_yaml, include_in_schema=False)
+
+    async def openapi_yaml(self, req: Request) -> Response:
+        urls = (server_data.get("url") for server_data in self.__fastapi.servers)
+        server_urls = {url for url in urls if url}
+        root_path = req.scope.get("root_path", "").rstrip("/")
+        if root_path and root_path not in server_urls and self.root_path_in_servers:
+            self.servers.insert(0, {"url": root_path})
+            server_urls.add(root_path)
+        openapi = self.__fastapi.openapi()
+        openapi_yaml = io.StringIO()
+        yaml.dump(openapi, openapi_yaml, sort_keys=False, allow_unicode=True)
+        return Response(openapi_yaml.getvalue(), media_type='text/yaml')
+
     def map_exception_to_handler(
-            self, exception: Type[Exception], handler: ExceptionHandlerType
+            self, exception: Type[Exception], handler: ExceptionHandlerType,
     ) -> None:
         self.MAP_EXCEPTION_HANDLER[exception] = handler
 
-    def create_app(self) -> FastAPI:
-        if not self.__fastapi:
-            self.__fastapi = FastAPI(title=self._app_name)
-        return self.__fastapi
-
-    async def start(self) -> Any:
-        self.__fastapi = self.create_app()
+    async def start(self) -> None:
         self.context[self._context_name] = self.__fastapi
 
         for exception, handler in self.MAP_EXCEPTION_HANDLER.items():
             if hasattr(self, handler.__name__):
-                self.__fastapi.exception_handler(exception)(partial(handler, self))  # type: ignore[arg-type]
+                self.__fastapi.exception_handler(exception)(partial(handler, self))
             else:
                 self.__fastapi.exception_handler(exception)(handler)
 
@@ -130,10 +155,10 @@ class FastAPIService(Service):
 
             resp_time = time.time() - start_time
             self.HTTP_REQUEST_DURATION_SECONDS.labels(
-                self._app_name, http_handler, request.method, response.status_code
+                self._app_name, http_handler, request.method, response.status_code,
             ).observe(resp_time)
             self.HTTP_RESPONSE_SIZE_BYTES.labels(
-                self._app_name, http_handler, request.method, response.status_code
+                self._app_name, http_handler, request.method, response.status_code,
             ).observe(int(response.headers.get('content-length', 0)))
             self.HTTP_REQUESTS_INFLIGHT.labels(self._app_name, http_handler).dec()
 
@@ -154,12 +179,11 @@ class FastAPIService(Service):
         ))
         self.__task = asyncio.create_task(self.__server_main.serve())
 
-    async def stop(self, exception: Optional[Exception] = None) -> Any:
+    async def stop(self, exception: Optional[Exception] = None) -> None:
         if self.__server_main:
             self.__server_main.set_should_exit()
             await self.__task  # type: ignore
-        self.__fastapi = None
 
     @property
     def fastapi(self) -> FastAPI:
-        return self.create_app()
+        return self.__fastapi

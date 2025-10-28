@@ -5,8 +5,7 @@ Buys when price is below moving average, sells when above.
 
 from decimal import Decimal
 
-from .base import (MarketDataPoint, SignalType, StrategySignal,
-                   TradingStrategyBase)
+from src.algo_trading.domain.strategies.base import MarketDataPoint, SignalType, StrategySignal, TradingStrategyBase
 
 
 class MeanReversionStrategy(TradingStrategyBase):
@@ -21,24 +20,25 @@ class MeanReversionStrategy(TradingStrategyBase):
 
     def _validate_parameters(self) -> None:
         """Validate required mean reversion parameters."""
-        required = {"moving_average_period", "std_dev_threshold", "position_size_pct"}
+        min_len_ma_period = 2
+        required = {'moving_average_period', 'std_dev_threshold', 'position_size_pct'}
 
         missing = required - set(self.parameters.keys())
         if missing:
-            raise ValueError(f"Missing required parameters: {missing}")
+            raise ValueError(f'Missing required parameters: {missing}')
 
         # Validate types and ranges
-        ma_period = self.parameters["moving_average_period"]
-        if not isinstance(ma_period, int) or ma_period < 2:
-            raise ValueError("moving_average_period must be >= 2")
+        ma_period = self.parameters['moving_average_period']
+        if not isinstance(ma_period, int) or ma_period < min_len_ma_period:
+            raise ValueError('moving_average_period must be >= 2')
 
-        std_threshold = Decimal(str(self.parameters["std_dev_threshold"]))
+        std_threshold = Decimal(str(self.parameters['std_dev_threshold']))
         if std_threshold <= 0:
-            raise ValueError("std_dev_threshold must be positive")
+            raise ValueError('std_dev_threshold must be positive')
 
-        position_pct = Decimal(str(self.parameters["position_size_pct"]))
-        if position_pct <= 0 or position_pct > 1:
-            raise ValueError("position_size_pct must be between 0 and 1")
+        position_pct = Decimal(str(self.parameters['position_size_pct']))
+        if position_pct <= Decimal('0') or position_pct > Decimal('1'):
+            raise ValueError('position_size_pct must be between 0 and 1')
 
     def generate_signal(
         self,
@@ -57,27 +57,26 @@ class MeanReversionStrategy(TradingStrategyBase):
         Returns:
             StrategySignal (BUY/SELL/HOLD)
         """
-        ma_period = self.parameters["moving_average_period"]
-        std_threshold = Decimal(str(self.parameters["std_dev_threshold"]))
+        ma_period = self.parameters['moving_average_period']
+        std_threshold = Decimal(str(self.parameters['std_dev_threshold']))
 
         # Need enough data for MA calculation
         if len(historical_data) < ma_period:
             return StrategySignal(
                 signal_type=SignalType.HOLD,
                 instrument=instrument,
-                reason="Insufficient historical data",
+                reason='Insufficient historical data',
             )
 
         # Calculate moving average
         recent_prices = [d.price for d in historical_data[-ma_period:]]
-        moving_average = Decimal(sum((p for p in recent_prices), Decimal("0"))) / Decimal(len(recent_prices))
+        moving_average = Decimal(sum((p for p in recent_prices), Decimal('0'))) / Decimal(len(recent_prices))
 
         # Calculate standard deviation
-        variance = (
-                Decimal(sum(((p - moving_average) ** 2 for p in recent_prices), Decimal("0"))) /
-                Decimal(len(recent_prices))
+        variance = Decimal(sum(((p - moving_average) ** 2 for p in recent_prices), Decimal('0'))) / Decimal(
+            len(recent_prices),
         )
-        std_dev = Decimal(str(variance)) ** Decimal("0.5")
+        std_dev = Decimal(str(variance)) ** Decimal('0.5')
 
         # Calculate bands
         lower_band = moving_average - (Decimal(str(std_threshold)) * std_dev)
@@ -88,9 +87,9 @@ class MeanReversionStrategy(TradingStrategyBase):
         # Calculate distance from MA in std devs
         if std_dev > 0:
             z_score = abs((current_price - moving_average) / std_dev)
-            confidence = min(z_score / std_threshold, Decimal("1.0"))
+            confidence = min(z_score / std_threshold, Decimal('1.0'))
         else:
-            confidence = Decimal("0")
+            confidence = Decimal('0')
 
         # Generate signal
         if current_price < lower_band:
@@ -100,24 +99,23 @@ class MeanReversionStrategy(TradingStrategyBase):
                 instrument=instrument,
                 target_price=current_price,
                 confidence=confidence,
-                reason=f"Oversold: price {current_price} < lower band {lower_band:.2f}",
+                reason=f'Oversold: price {current_price} < lower band {lower_band:.2f}',
             )
-        elif current_price > upper_band:
+        if current_price > upper_band:
             # Overbought - sell signal
             return StrategySignal(
                 signal_type=SignalType.SELL,
                 instrument=instrument,
                 target_price=current_price,
                 confidence=confidence,
-                reason=f"Overbought: price {current_price} > upper band {upper_band:.2f}",
+                reason=f'Overbought: price {current_price} > upper band {upper_band:.2f}',
             )
-        else:
-            # Within normal range
-            return StrategySignal(
-                signal_type=SignalType.HOLD,
-                instrument=instrument,
-                reason=f"Price {current_price} within bands [{lower_band:.2f}, {upper_band:.2f}]",
-            )
+        # Within normal range
+        return StrategySignal(
+            signal_type=SignalType.HOLD,
+            instrument=instrument,
+            reason=f'Price {current_price} within bands [{lower_band:.2f}, {upper_band:.2f}]',
+        )
 
     def calculate_position_size(
         self,
@@ -136,14 +134,12 @@ class MeanReversionStrategy(TradingStrategyBase):
         Returns:
             Position size (quantity)
         """
-        position_size_pct = Decimal(str(self.parameters["position_size_pct"]))
+        position_size_pct = Decimal(str(self.parameters['position_size_pct']))
 
         # Adjust by confidence (stronger deviation = larger position)
-        confidence = signal.confidence or Decimal("1.0")
+        confidence = signal.confidence or Decimal('1.0')
         adjusted_pct = position_size_pct * confidence
 
         # Calculate quantity
         capital_to_use = available_capital * adjusted_pct
-        quantity = capital_to_use / current_price if current_price > 0 else Decimal("0")
-
-        return quantity
+        return capital_to_use / current_price if current_price > 0 else Decimal('0')

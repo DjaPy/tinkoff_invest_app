@@ -6,7 +6,7 @@ Pure business logic for performance metrics, independent of infrastructure.
 import math
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import NamedTuple, Sequence
+from typing import NamedTuple
 
 
 class TradeStatistic(NamedTuple):
@@ -52,13 +52,10 @@ class PerformanceCalculator:
     """
 
     TRADING_DAYS_PER_YEAR = 252
-    RISK_FREE_RATE = Decimal("0.03")  # 3% annual risk-free rate
+    RISK_FREE_RATE = Decimal('0.03')  # 3% annual risk-free rate
 
     @staticmethod
-    def calculate_total_return(
-        starting_capital: Decimal,
-        ending_capital: Decimal,
-    ) -> Decimal:
+    def calculate_total_return(starting_capital: Decimal, ending_capital: Decimal) -> Decimal:
         """
         Calculate total return percentage.
 
@@ -70,15 +67,12 @@ class PerformanceCalculator:
             Total return as decimal (0.15 = 15%)
         """
         if starting_capital == 0:
-            return Decimal("0")
+            return Decimal('0')
 
         return (ending_capital - starting_capital) / starting_capital
 
     @staticmethod
-    def calculate_annualized_return(
-        total_return: Decimal,
-        days: int,
-    ) -> Decimal:
+    def calculate_annualized_return(total_return: Decimal, days: int) -> Decimal:
         """
         Calculate annualized return from total return.
 
@@ -90,7 +84,7 @@ class PerformanceCalculator:
             Annualized return as decimal
         """
         if days == 0:
-            return Decimal("0")
+            return Decimal('0')
 
         # Compound annual growth rate (CAGR)
         years = Decimal(days) / Decimal(PerformanceCalculator.TRADING_DAYS_PER_YEAR)
@@ -99,9 +93,7 @@ class PerformanceCalculator:
 
         # (1 + return)^(1/years) - 1
         return_factor = float(1 + total_return)
-        annualized = Decimal(math.pow(return_factor, 1 / float(years)) - 1)
-
-        return annualized
+        return Decimal(math.pow(return_factor, 1 / float(years)) - 1)
 
     @staticmethod
     def calculate_volatility(returns: list[Decimal]) -> Decimal:
@@ -114,8 +106,9 @@ class PerformanceCalculator:
         Returns:
             Volatility as decimal
         """
-        if len(returns) < 2:
-            return Decimal("0")
+        count_returns = 2
+        if len(returns) < count_returns:
+            return Decimal('0')
 
         # Calculate mean
         mean_return = Decimal(sum(returns)) / Decimal(len(returns))
@@ -124,15 +117,13 @@ class PerformanceCalculator:
         variance = Decimal(sum((r - mean_return) ** 2 for r in returns)) / (Decimal(len(returns) - 1))
 
         # Standard deviation
-        volatility = Decimal(math.sqrt(float(variance)))
-
-        return volatility
+        return Decimal(math.sqrt(float(variance)))
 
     @staticmethod
     def calculate_sharpe_ratio(
         average_return: Decimal,
         volatility: Decimal,
-        risk_free_rate: Decimal | None = None,
+        risk_free_rate: Decimal = Decimal('0'),
     ) -> Decimal:
         """
         Calculate Sharpe ratio (risk-adjusted return).
@@ -146,7 +137,7 @@ class PerformanceCalculator:
             Sharpe ratio
         """
         if volatility == 0:
-            return Decimal("0")
+            return Decimal('0')
 
         if risk_free_rate is None:
             risk_free_rate = PerformanceCalculator.RISK_FREE_RATE
@@ -158,40 +149,36 @@ class PerformanceCalculator:
         sharpe = excess_return / volatility
 
         # Annualize
-        sharpe_annualized = sharpe * Decimal(math.sqrt(PerformanceCalculator.TRADING_DAYS_PER_YEAR))
-
-        return sharpe_annualized
+        return sharpe * Decimal(math.sqrt(PerformanceCalculator.TRADING_DAYS_PER_YEAR))
 
     @staticmethod
-    def calculate_max_drawdown(equity_curve: Sequence[Decimal]) -> Decimal:
+    def calculate_max_drawdown(equity_curve: list[Decimal]) -> Decimal:
         """
         Calculate maximum drawdown from equity curve.
 
         Args:
-            equity_curve: Sequence of portfolio values over time
+            equity_curve: List of portfolio values over time
 
         Returns:
             Maximum drawdown as negative decimal (-0.15 = -15%)
         """
-        if len(equity_curve) < 2:
-            return Decimal("0")
+        min_len_equity_curve = 2
+        if len(equity_curve) < min_len_equity_curve:
+            return Decimal('0')
 
-        max_drawdown = Decimal("0")
+        max_drawdown = Decimal('0')
         peak = equity_curve[0]
 
         for value in equity_curve:
-            if value > peak:
-                peak = value
+            peak = max(peak, value)
 
-            drawdown = (value - peak) / peak if peak > 0 else Decimal("0")
+            drawdown = (value - peak) / peak if peak > 0 else Decimal('0')
             max_drawdown = min(max_drawdown, drawdown)
 
         return max_drawdown
 
     @staticmethod
-    def calculate_trade_statistics(
-            trades: list[Trade]
-    ) -> TradeStatistic:
+    def calculate_trade_statistics(trades: list[Trade]) -> TradeStatistic:
         """
         Calculate trade-level statistics.
 
@@ -202,7 +189,7 @@ class PerformanceCalculator:
             Tuple of (win_rate, profit_factor, avg_win, avg_loss, largest_win, largest_loss)
         """
         if not trades:
-            return TradeStatistic(Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("0"))
+            return TradeStatistic(Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'), Decimal('0'))
 
         winning_trades = [t for t in trades if t.pnl > 0]
         losing_trades = [t for t in trades if t.pnl < 0]
@@ -211,17 +198,17 @@ class PerformanceCalculator:
         win_rate = Decimal(len(winning_trades)) / Decimal(len(trades))
 
         # Profit factor
-        gross_profit = Decimal(sum((t.pnl for t in winning_trades), Decimal("0"))) if winning_trades else Decimal("0")
-        gross_loss = Decimal(abs(sum((t.pnl for t in losing_trades), Decimal("0")))) if losing_trades else Decimal("0")
-        profit_factor = gross_profit / gross_loss if gross_loss > Decimal("0") else Decimal("0")
+        gross_profit = Decimal(sum((t.pnl for t in winning_trades), Decimal('0'))) if winning_trades else Decimal('0')
+        gross_loss = Decimal(abs(sum((t.pnl for t in losing_trades), Decimal('0')))) if losing_trades else Decimal('0')
+        profit_factor = gross_profit / gross_loss if gross_loss > Decimal('0') else Decimal('0')
 
         # Average win/loss
-        avg_win = gross_profit / len(winning_trades) if winning_trades else Decimal("0")
-        avg_loss = gross_loss / len(losing_trades) if losing_trades else Decimal("0")
+        avg_win = gross_profit / len(winning_trades) if winning_trades else Decimal('0')
+        avg_loss = gross_loss / len(losing_trades) if losing_trades else Decimal('0')
 
         # Largest win/loss
-        largest_win = max((t.pnl for t in winning_trades), default=Decimal("0"))
-        largest_loss = min((t.pnl for t in losing_trades), default=Decimal("0"))
+        largest_win = max((t.pnl for t in winning_trades), default=Decimal('0'))
+        largest_loss = min((t.pnl for t in losing_trades), default=Decimal('0'))
 
         return TradeStatistic(win_rate, profit_factor, avg_win, avg_loss, largest_win, largest_loss)
 
@@ -248,26 +235,18 @@ class PerformanceCalculator:
         Returns:
             PerformanceResult with all metrics
         """
-        total_return = PerformanceCalculator.calculate_total_return(
-            starting_capital, ending_capital
-        )
+        total_return = PerformanceCalculator.calculate_total_return(starting_capital, ending_capital)
 
-        annualized_return = PerformanceCalculator.calculate_annualized_return(
-            total_return, days
-        )
+        annualized_return = PerformanceCalculator.calculate_annualized_return(total_return, days)
 
         volatility = PerformanceCalculator.calculate_volatility(returns)
-        pre_average_return = Decimal(sum((r for r in returns), Decimal("0"))) / Decimal(len(returns))
-        average_return = pre_average_return if returns else Decimal("0")
-        sharpe_ratio = PerformanceCalculator.calculate_sharpe_ratio(
-            average_return, volatility
-        )
+        pre_average_return = Decimal(sum((r for r in returns), Decimal('0'))) / Decimal(len(returns))
+        average_return = pre_average_return if returns else Decimal('0')
+        sharpe_ratio = PerformanceCalculator.calculate_sharpe_ratio(average_return, volatility)
 
         max_drawdown = PerformanceCalculator.calculate_max_drawdown(equity_curve)
 
-        trade_statistics = (
-            PerformanceCalculator.calculate_trade_statistics(trades)
-        )
+        trade_statistics = PerformanceCalculator.calculate_trade_statistics(trades)
 
         return PerformanceResult(
             total_return=total_return,

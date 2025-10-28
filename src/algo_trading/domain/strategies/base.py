@@ -13,9 +13,9 @@ from typing import Any
 class SignalType(str, Enum):
     """Trading signal types."""
 
-    BUY = "buy"
-    SELL = "sell"
-    HOLD = "hold"
+    BUY = 'buy'
+    SELL = 'sell'
+    HOLD = 'hold'
 
 
 @dataclass(frozen=True)
@@ -34,9 +34,9 @@ class StrategySignal:
 
     signal_type: SignalType
     instrument: str
-    quantity: Decimal | None = None
-    target_price:Decimal | None = None
-    confidence: Decimal | None = None
+    quantity: Decimal = Decimal('0')
+    target_price: Decimal = Decimal('0')
+    confidence: Decimal = Decimal('0')
     reason: str | None = None
 
 
@@ -47,7 +47,7 @@ class TradingStrategyBase(ABC):
     Pure domain logic - no infrastructure dependencies.
     """
 
-    def __init__(self, parameters: dict):
+    def __init__(self, parameters: dict) -> None:
         """
         Initialize strategy with parameters.
 
@@ -65,7 +65,6 @@ class TradingStrategyBase(ABC):
         Raises:
             ValueError: If parameters are invalid
         """
-        pass
 
     @abstractmethod
     def generate_signal(
@@ -85,7 +84,6 @@ class TradingStrategyBase(ABC):
         Returns:
             StrategySignal with buy/sell/hold decision
         """
-        pass
 
     @abstractmethod
     def calculate_position_size(
@@ -105,4 +103,3 @@ class TradingStrategyBase(ABC):
         Returns:
             Position size (quantity)
         """
-        pass

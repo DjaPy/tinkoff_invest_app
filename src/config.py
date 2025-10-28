@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from src.base.fastapi_service import FastAPISettings
 from src.base.mongo_service.config import MongoDBSettings
-from src.tinkoff_invest.config import TinkoffInvestSettings
+from src.base.tinkoff_invest.config import TinkoffInvestSettings
 
 
 class Config(BaseSettings):

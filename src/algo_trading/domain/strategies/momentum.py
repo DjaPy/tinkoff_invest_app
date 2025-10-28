@@ -5,8 +5,7 @@ Buys when price momentum is strong, sells when momentum weakens.
 
 from decimal import Decimal
 
-from .base import (MarketDataPoint, SignalType, StrategySignal,
-                   TradingStrategyBase)
+from src.algo_trading.domain.strategies.base import MarketDataPoint, SignalType, StrategySignal, TradingStrategyBase
 
 
 class MomentumStrategy(TradingStrategyBase):
@@ -21,24 +20,24 @@ class MomentumStrategy(TradingStrategyBase):
 
     def _validate_parameters(self) -> None:
         """Validate required momentum parameters."""
-        required = {"lookback_period", "momentum_threshold", "position_size_pct"}
+        required = {'lookback_period', 'momentum_threshold', 'position_size_pct'}
 
         missing = required - set(self.parameters.keys())
         if missing:
-            raise ValueError(f"Missing required parameters: {missing}")
+            raise ValueError(f'Missing required parameters: {missing}')
 
         # Validate types and ranges
-        lookback = self.parameters["lookback_period"]
+        lookback = self.parameters['lookback_period']
         if not isinstance(lookback, int) or lookback < 1:
-            raise ValueError("lookback_period must be positive integer")
+            raise ValueError('lookback_period must be positive integer')
 
-        threshold = Decimal(str(self.parameters["momentum_threshold"]))
+        threshold = Decimal(str(self.parameters['momentum_threshold']))
         if threshold <= 0 or threshold > 1:
-            raise ValueError("momentum_threshold must be between 0 and 1")
+            raise ValueError('momentum_threshold must be between 0 and 1')
 
-        position_pct = Decimal(str(self.parameters["position_size_pct"]))
+        position_pct = Decimal(str(self.parameters['position_size_pct']))
         if position_pct <= 0 or position_pct > 1:
-            raise ValueError("position_size_pct must be between 0 and 1")
+            raise ValueError('position_size_pct must be between 0 and 1')
 
     def generate_signal(
         self,
@@ -57,15 +56,15 @@ class MomentumStrategy(TradingStrategyBase):
         Returns:
             StrategySignal (BUY/SELL/HOLD)
         """
-        lookback_period = self.parameters["lookback_period"]
-        momentum_threshold = Decimal(str(self.parameters["momentum_threshold"]))
+        lookback_period = self.parameters['lookback_period']
+        momentum_threshold = Decimal(str(self.parameters['momentum_threshold']))
 
         # Need enough historical data
         if len(historical_data) < lookback_period:
             return StrategySignal(
                 signal_type=SignalType.HOLD,
                 instrument=instrument,
-                reason="Insufficient historical data",
+                reason='Insufficient historical data',
             )
 
         # Calculate momentum: (current_price - past_price) / past_price
@@ -76,13 +75,13 @@ class MomentumStrategy(TradingStrategyBase):
             return StrategySignal(
                 signal_type=SignalType.HOLD,
                 instrument=instrument,
-                reason="Invalid past price (zero)",
+                reason='Invalid past price (zero)',
             )
 
         momentum = (current_price - past_price) / past_price
 
         # Calculate confidence based on momentum strength
-        confidence = min(abs(momentum) / momentum_threshold, Decimal("1.0"))
+        confidence = min(abs(momentum) / momentum_threshold, Decimal('1.0'))
 
         # Generate signal
         if momentum > momentum_threshold:
@@ -91,22 +90,21 @@ class MomentumStrategy(TradingStrategyBase):
                 instrument=instrument,
                 target_price=current_price,
                 confidence=confidence,
-                reason=f"Strong upward momentum: {momentum:.4f}",
+                reason=f'Strong upward momentum: {momentum:.4f}',
             )
-        elif momentum < -momentum_threshold:
+        if momentum < -momentum_threshold:
             return StrategySignal(
                 signal_type=SignalType.SELL,
                 instrument=instrument,
                 target_price=current_price,
                 confidence=confidence,
-                reason=f"Strong downward momentum: {momentum:.4f}",
+                reason=f'Strong downward momentum: {momentum:.4f}',
             )
-        else:
-            return StrategySignal(
-                signal_type=SignalType.HOLD,
-                instrument=instrument,
-                reason=f"Weak momentum: {momentum:.4f}",
-            )
+        return StrategySignal(
+            signal_type=SignalType.HOLD,
+            instrument=instrument,
+            reason=f'Weak momentum: {momentum:.4f}',
+        )
 
     def calculate_position_size(
         self,
@@ -127,14 +125,12 @@ class MomentumStrategy(TradingStrategyBase):
         Returns:
             Position size (quantity)
         """
-        position_size_pct = Decimal(str(self.parameters["position_size_pct"]))
+        position_size_pct = Decimal(str(self.parameters['position_size_pct']))
 
         # Adjust position size by confidence
-        confidence = signal.confidence or Decimal("1.0")
+        confidence = signal.confidence or Decimal('1.0')
         adjusted_pct = position_size_pct * confidence
 
         # Calculate quantity
         capital_to_use = available_capital * adjusted_pct
-        quantity = capital_to_use / current_price if current_price > 0 else Decimal("0")
-
-        return quantity
+        return capital_to_use / current_price if current_price > 0 else Decimal('0')

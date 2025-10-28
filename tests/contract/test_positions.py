@@ -23,9 +23,9 @@ from src.algo_trading.adapters.models.position import PortfolioPosition
 class PositionListResponse(BaseModel):
     """Response schema for GET /api/v1/positions."""
 
-    positions: list[PortfolioPosition] = Field(description="List of portfolio positions")
-    total_value: Decimal = Field(ge=0, description="Total portfolio market value")
-    total_pnl: Decimal = Field(description="Total unrealized P&L")
+    positions: list[PortfolioPosition] = Field(description='List of portfolio positions')
+    total_value: Decimal = Field(ge=0, description='Total portfolio market value')
+    total_pnl: Decimal = Field(description='Total unrealized P&L')
 
 
 # ==================== GET /api/v1/positions TESTS ====================
@@ -35,12 +35,12 @@ class PositionListResponse(BaseModel):
 async def test_get_positions_returns_position_list(client, config):
     """Test GET /api/v1/positions returns list of positions"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Contract assertions
         assert response.status == status.HTTP_200_OK
-        assert "application/json" in response.headers["content-type"]
+        assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
@@ -56,8 +56,8 @@ async def test_get_positions_returns_position_list(client, config):
 async def test_get_positions_validates_position_structure(client, config):
     """Test GET /api/v1/positions returns positions with correct Pydantic structure"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -84,8 +84,8 @@ async def test_get_positions_validates_position_structure(client, config):
 async def test_get_positions_empty_list(client, config, mongo_connection):
     """Test GET /api/v1/positions returns empty list when no positions"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -103,8 +103,8 @@ async def test_get_positions_filter_by_strategy_id(client, config):
     strategy_id = uuid4()
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions?strategy_id={strategy_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions?strategy_id={strategy_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -118,11 +118,11 @@ async def test_get_positions_filter_by_strategy_id(client, config):
 @pytest.mark.asyncio
 async def test_get_positions_filter_by_instrument(client, config):
     """Test GET /api/v1/positions can filter by instrument"""
-    instrument = "AAPL"
+    instrument = 'AAPL'
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions?instrument={instrument}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions?instrument={instrument}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -137,8 +137,8 @@ async def test_get_positions_filter_by_instrument(client, config):
 async def test_get_positions_calculates_totals_correctly(client, config):
     """Test GET /api/v1/positions calculates total_value and total_pnl correctly"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -158,12 +158,12 @@ async def test_get_positions_calculates_totals_correctly(client, config):
 async def test_get_positions_unauthorized(client, config):
     """Test GET /api/v1/positions requires authentication"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions",
-        headers={"Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
+        headers={'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
         data = await response.json()
-        assert data["status"] == 401
+        assert data['status'] == 401
 
 
 # ==================== GET /api/v1/positions/{position_id} TESTS ====================
@@ -175,12 +175,12 @@ async def test_get_position_by_id_returns_position_details(client, config):
     position_id = uuid4()
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Contract assertions
         assert response.status == status.HTTP_200_OK
-        assert "application/json" in response.headers["content-type"]
+        assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
@@ -200,8 +200,8 @@ async def test_get_position_by_id_includes_computed_fields(client, config):
     position_id = uuid4()
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
@@ -226,12 +226,12 @@ async def test_get_position_by_id_not_found(client, config):
     non_existent_id = uuid4()
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions/{non_existent_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{non_existent_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_404_NOT_FOUND
         data = await response.json()
-        assert data["status"] == 404
+        assert data['status'] == 404
 
 
 @pytest.mark.asyncio
@@ -240,31 +240,24 @@ async def test_get_position_by_id_unauthorized(client, config):
     position_id = uuid4()
 
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}",
-        headers={"Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}',
+        headers={'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
         data = await response.json()
-        assert data["status"] == 401
+        assert data['status'] == 401
 
 
-@pytest.mark.parametrize(
-    "invalid_id",
-    [
-        "not-a-uuid",
-        "12345",
-        "invalid-format",
-    ],
-)
+@pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
 @pytest.mark.asyncio
 async def test_get_position_by_id_invalid_uuid_format(client, config, invalid_id):
     """Test GET /api/v1/positions/{position_id} validates UUID format"""
     async with client.get(
-        url=f"http://127.0.0.1:{config.http.port}/api/v1/positions/{invalid_id}",
-        headers={"Authorization": "Bearer test-token", "Content-Type": "application/json"},
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{invalid_id}',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         # Should return 400 or 422 for invalid UUID format
         assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
         data = await response.json()
-        assert "type" in data
-        assert "status" in data
+        assert 'type' in data
+        assert 'status' in data
