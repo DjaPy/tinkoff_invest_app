@@ -9,8 +9,9 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from algo_trading.adapters.models import TradeOrderDocument
+from algo_trading.enums import OrderStatusEnum
 from src.algo_trading.adapters.dto_models.order_dto import OrderDTO
-from src.algo_trading.adapters.models.order import OrderStatusEnum, TradeOrderDocument
 
 
 class OrderRepository:
@@ -35,7 +36,7 @@ class OrderRepository:
             All order state changes are immutable once persisted.
             :param order:
         """
-        order = TradeOrderDocument(
+        order_data = TradeOrderDocument(
             strategy_id=order.strategy_id,
             session_id=order.session_id,
             instrument=order.instrument,
@@ -46,8 +47,8 @@ class OrderRepository:
             status=OrderStatusEnum.PENDING,
         )
 
-        await order.insert()
-        return order
+        await order_data.insert()
+        return order_data
 
     async def find_by_id(self, order_id: UUID) -> TradeOrderDocument | None:
         """

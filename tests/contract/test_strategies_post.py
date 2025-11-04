@@ -6,7 +6,6 @@ It should FAIL until the actual endpoint implementation is complete.
 """
 
 
-# This will fail until the endpoint is implemented
 def test_post_strategies_creates_new_strategy():
     """Test POST /api/v1/strategies creates a new trading strategy"""
     # This test is designed to FAIL until implementation

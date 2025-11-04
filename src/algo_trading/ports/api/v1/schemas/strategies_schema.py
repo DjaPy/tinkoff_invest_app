@@ -1,5 +1,11 @@
 from pydantic import BaseModel, Field
 
+from src.algo_trading.adapters.models import (
+    ArbitrageParameters,
+    MarketMakingParameters,
+    MeanReversionParameters,
+    MomentumParameters,
+)
 from src.algo_trading.adapters.models import RiskControls, StrategyTypeEnum, TradingStrategyDocument
 
 
@@ -16,7 +22,7 @@ class UpdateStrategyRequestSchema(BaseModel):
     """Request schema for updating a strategy."""
 
     name: str | None = Field(None, min_length=1, max_length=100, description='Strategy name')
-    parameters: dict | None = Field(None, description='Strategy-specific parameters')
+    parameters: MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters | None = Field(None, description='Strategy-specific parameters')
     risk_controls: RiskControls | None = Field(None, description='Risk management configuration')
 
 

@@ -5,11 +5,17 @@ Orchestrates strategy lifecycle: create, start, pause, stop, delete.
 
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, UTC
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
+from algo_trading.adapters.models import (
+    ArbitrageParameters,
+    MarketMakingParameters,
+    MeanReversionParameters,
+    MomentumParameters,
+)
 from src.algo_trading.adapters.models import (
     RiskControls,
     StrategyStatusEnum,
@@ -172,7 +178,7 @@ class StrategyManager:
     async def update_strategy(
         self,
         strategy_id: UUID,
-        parameters: dict[str, Any] | None = None,
+        parameters: MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters | None = None,
         risk_controls: dict[str, Any] | None = None,
     ) -> TradingStrategyDocument:
         """
@@ -191,7 +197,6 @@ class StrategyManager:
         """
         strategy = await self.get_strategy(strategy_id)
 
-        # Cannot update active strategy
         if strategy.status == StrategyStatusEnum.ACTIVE:
             raise StrategyManagerError('Cannot update active strategy. Pause or stop it first.')
 
@@ -201,7 +206,7 @@ class StrategyManager:
         if risk_controls is not None:
             strategy.risk_controls = RiskControls(**risk_controls)
 
-        strategy.updated_at = datetime.utcnow()
+        strategy.updated_at = datetime.now(tz=UTC)
 
         await self.strategy_repo.update(strategy)
 
@@ -268,7 +273,11 @@ class StrategyManager:
 
         return strategy
 
-    async def stop_strategy(self, strategy_id: UUID, ending_capital: Decimal) -> tuple[TradingStrategyDocument, TradingSessionDocument]:
+    async def stop_strategy(
+        self,
+        strategy_id: UUID,
+        ending_capital: Decimal,
+    ) -> tuple[TradingStrategyDocument, TradingSessionDocument]:
         """
         Stop strategy execution (close positions, end session).
 
@@ -287,7 +296,6 @@ class StrategyManager:
         if not strategy.can_transition_to(StrategyStatusEnum.STOPPED):
             raise StrategyManagerError(f'Cannot stop strategy in {strategy.status} status. Must be ACTIVE or PAUSED.')
 
-        # Find active session
         active_session = await TradingSessionDocument.find_one(
             TradingSessionDocument.strategy_id == strategy.strategy_id,
             TradingSessionDocument.session_end == None,  # noqa: E711

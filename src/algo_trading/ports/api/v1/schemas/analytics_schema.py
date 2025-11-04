@@ -22,7 +22,7 @@ def check_period(from_date: datetime | None, to_date: datetime | None, period: P
             detail=f'from_date and to_date are required when period={period}',
         )
 
-def calculate_period_dates(period: PeriodEnum) -> tuple[datetime, datetime]:
+def calculate_period_dates(period: PeriodEnum | None) -> tuple[datetime, datetime]:
     end_date = datetime.now(tz=UTC)
 
     one_days = end_date - timedelta(days=1)
@@ -33,6 +33,7 @@ def calculate_period_dates(period: PeriodEnum) -> tuple[datetime, datetime]:
         PeriodEnum.month: end_date - timedelta(days=30),
         PeriodEnum.quarter: end_date - timedelta(days=90),
         PeriodEnum.year: end_date - timedelta(days=365),
+        None : one_days,
     }
 
 

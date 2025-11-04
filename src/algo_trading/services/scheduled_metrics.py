@@ -8,7 +8,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta
 
-from aiomisc import PeriodicService
+from aiomisc.service.periodic import PeriodicService
 
 from src.algo_trading.adapters.models import StrategyStatusEnum, TradingStrategyDocument
 from src.algo_trading.services.performance_analytics import PerformanceAnalytics, PerformanceAnalyticsError
@@ -69,8 +69,7 @@ class ScheduledMetricsService(PeriodicService):
 
         # Find all active or deployed strategies
         strategies = await TradingStrategyDocument.find(
-            (TradingStrategyDocument.status == StrategyStatusEnum.ACTIVE)
-            | (TradingStrategyDocument.status == StrategyStatusEnum.DEPLOYED),
+            TradingStrategyDocument.status == StrategyStatusEnum.ACTIVE
         ).to_list()
 
         if not strategies:

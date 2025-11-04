@@ -1,6 +1,6 @@
 from decimal import Decimal
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
     TradeAnalyticsResponseSchema,
@@ -227,7 +227,6 @@ class TradeMetricsCalculator:
         current_drawdown = Decimal('0')
         drawdown_periods = []
 
-        # Track drawdown periods
         in_drawdown = False
         drawdown_start = None
         drawdown_start_equity = None
@@ -236,11 +235,8 @@ class TradeMetricsCalculator:
             equity = point['equity']
             timestamp = point['timestamp']
 
-            # Update peak if we have a new high
             if equity > peak:
-                # End of drawdown period
                 if in_drawdown and drawdown_start:
-                    duration = (timestamp - drawdown_start).days
                     drawdown_pct = (drawdown_start_equity - peak) / peak if peak > 0 else Decimal('0')
                     drawdown_periods.append({
                         'start': drawdown_start.isoformat(),
@@ -251,29 +247,23 @@ class TradeMetricsCalculator:
 
                 peak = equity
 
-            # Calculate current drawdown
             drawdown = (equity - peak) / peak if peak > 0 else Decimal('0')
 
-            # Start new drawdown period
             if drawdown < 0 and not in_drawdown:
                 in_drawdown = True
                 drawdown_start = timestamp
                 drawdown_start_equity = peak
 
-            # Track maximum drawdown
             if drawdown < max_drawdown:
                 max_drawdown = drawdown
                 if drawdown_start:
                     max_drawdown_duration = (timestamp - drawdown_start).days
 
-            # Update current drawdown (last point)
             if i == len(equity_curve) - 1:
                 current_drawdown = drawdown
 
-        # If still in drawdown at the end
         if in_drawdown and drawdown_start:
             last_point = equity_curve[-1]
-            duration = (last_point['timestamp'] - drawdown_start).days
             drawdown_pct = (last_point['equity'] - peak) / peak if peak > 0 else Decimal('0')
             drawdown_periods.append({
                 'start': drawdown_start.isoformat(),
@@ -298,7 +288,7 @@ class AdvancedTradeMetricsCalculator:
         if total_trades == 0:
             return Decimal("0")
         return (Decimal(str(winning_trades)) / Decimal(str(total_trades))) * Decimal(
-            "100"
+            "100",
         )
 
     @staticmethod
@@ -307,15 +297,15 @@ class AdvancedTradeMetricsCalculator:
         losing_trades: list[Decimal],
     ) -> Decimal:
         """Calculate profit factor (gross profit / gross loss)."""
-        gross_profit = sum(winning_trades) if winning_trades else Decimal("0")
-        gross_loss = abs(sum(losing_trades)) if losing_trades else Decimal("0")
+        gross_profit = Decimal(str(sum(winning_trades))) if winning_trades else Decimal("0")
+        gross_loss = Decimal(str(abs(sum(losing_trades)))) if losing_trades else Decimal("0")
 
         if gross_loss == 0:
             return (
                 Decimal("0") if gross_profit == 0 else Decimal("999.99")
             )
 
-        return gross_profit / gross_loss
+        return gross_profit / Decimal(gross_loss)
 
     @staticmethod
     def calculate_max_drawdown(trades: list) -> Decimal:
@@ -336,11 +326,9 @@ class AdvancedTradeMetricsCalculator:
             )
             running_pnl += pnl
 
-            if running_pnl > peak:
-                peak = running_pnl
+            peak = max(peak, running_pnl)
 
             drawdown = peak - running_pnl
-            if drawdown > max_drawdown:
-                max_drawdown = drawdown
+            max_drawdown = max(max_drawdown, drawdown)
 
         return max_drawdown

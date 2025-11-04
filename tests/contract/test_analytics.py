@@ -22,6 +22,7 @@ from starlette import status
 
 from algo_trading.ports.api.v1.schemas.analytics_schema import (
     DrawdownAnalysisResponseSchema,
+    MarketDataAnalyticsResponseSchema,
     PortfolioSummaryResponseSchema,
     TradeAnalyticsResponseSchema,
 )
@@ -270,7 +271,7 @@ async def test_get_portfolio_summary_with_period(client, config):
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
-        summary = PortfolioSummary(**data)
+        summary = PortfolioSummaryResponseSchema(**data)
         assert summary.total_value >= 0
 
 
@@ -289,7 +290,7 @@ async def test_get_market_data_analytics(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        market_data = MarketDataAnalytics(**data)
+        market_data = MarketDataAnalyticsResponseSchema(**data)
         assert market_data.instrument == instrument
         assert market_data.timeframe is not None
         assert isinstance(market_data.data_points, list)
@@ -308,7 +309,7 @@ async def test_get_market_data_with_timeframe(client, config, timeframe):
     ) as response:
         if response.status == status.HTTP_200_OK:
             data = await response.json()
-            market_data = MarketDataAnalytics(**data)
+            market_data = MarketDataAnalyticsResponseSchema(**data)
             assert market_data.timeframe == timeframe
 
 

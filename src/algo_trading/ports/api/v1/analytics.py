@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from src.algo_trading.adapters.repositories.strategy_repository import StrategyRepository
 from src.algo_trading.enums import PeriodEnum
 from src.algo_trading.services.performance_analytics import PerformanceAnalytics
-from src.algo_trading.services.trade_analytics import TradeAnalytics, TradeMetricsCalculator
+from src.algo_trading.services.trade_analytics import TradeAnalytics
 from src.algo_trading.services.portfolio_analytics import PortfolioAnalytics
 from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import (

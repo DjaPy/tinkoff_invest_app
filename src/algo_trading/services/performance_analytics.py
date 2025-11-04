@@ -31,7 +31,7 @@ class PerformanceAnalytics:
 
     def __init__(
         self,
-        calculator: PerformanceCalculator | None = None
+        calculator: PerformanceCalculator | None = None,
     ) -> None:
         """
         Initialize PerformanceAnalytics.
@@ -98,7 +98,7 @@ class PerformanceAnalytics:
 
         orders = await TradeOrderDocument.find(
             TradeOrderDocument.strategy_id == strategy_id,
-            TradeOrderDocument.filled_at != None,
+            TradeOrderDocument.filled_at != None,  # noqa: E711
             TradeOrderDocument.filled_at >= period_start,  # type: ignore[operator]
             TradeOrderDocument.filled_at <= period_end,  # type: ignore[operator]
             TradeOrderDocument.status == OrderStatusEnum.FILLED,

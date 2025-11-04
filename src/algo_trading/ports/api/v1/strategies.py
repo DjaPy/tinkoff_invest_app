@@ -10,7 +10,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
-from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, TradingStrategyDocument
+from src.algo_trading.enums import StrategyStatusEnum
+from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
     CreateStrategyRequestSchema,
     StrategyListResponseSchema,
@@ -116,13 +117,13 @@ async def get_strategy(strategy_id: UUID) -> TradingStrategyDocument:
     summary='Update trading strategy',
     description='Update strategy configuration and risk controls',
 )
-async def update_strategy(strategy_id: UUID, request: UpdateStrategyRequestSchema) -> TradingStrategyDocument:
+async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) -> TradingStrategyDocument:
     """
     Update existing strategy (T044).
 
     Args:
         strategy_id: Unique strategy identifier
-        request: Strategy update request with optional fields
+        body: Strategy update request with optional fields
 
     Returns:
         Updated strategy
@@ -138,14 +139,14 @@ async def update_strategy(strategy_id: UUID, request: UpdateStrategyRequestSchem
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
     # Update fields if provided
-    if request.name is not None:
-        strategy.name = request.name
+    if body.name is not None:
+        strategy.name = body.name
 
-    if request.parameters is not None:
-        strategy.parameters = request.parameters
+    if body.parameters is not None:
+        strategy.parameters = body.parameters
 
-    if request.risk_controls is not None:
-        strategy.risk_controls = request.risk_controls
+    if body.risk_controls is not None:
+        strategy.risk_controls = body.risk_controls
 
     strategy.updated_at = datetime.now(UTC)
 

@@ -54,7 +54,7 @@ async def list_positions(
 
 
     if len(positions) == 0:
-        return PositionListResponse(positions=[], total_value=Decimal('0'), total_pnl=Decimal('0'))
+        return PositionListResponseSchema(positions=[], total_value=Decimal('0'), total_pnl=Decimal('0'))
     total_value = sum(pos.market_value for pos in positions)
     total_pnl = sum(pos.unrealized_pnl for pos in positions)
 

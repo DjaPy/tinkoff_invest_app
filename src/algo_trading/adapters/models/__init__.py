@@ -1,8 +1,14 @@
 """Beanie ODM Models for Algorithmic Trading - Hexagonal Architecture Adapters."""
-
+from src.algo_trading.enums import (
+    OrderSideEnum,
+    OrderStatusEnum,
+    OrderTypeEnum,
+    StrategyStatusEnum,
+    StrategyTypeEnum,
+)
 from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
-from src.algo_trading.adapters.models.order import OrderSideEnum, OrderStatusEnum, OrderTypeEnum, TradeOrderDocument
+from src.algo_trading.adapters.models.order import TradeOrderDocument
 from src.algo_trading.adapters.models.position import PortfolioPositionDocument
 from src.algo_trading.adapters.models.session import TradingSessionDocument
 from src.algo_trading.adapters.models.strategy import (
@@ -11,11 +17,18 @@ from src.algo_trading.adapters.models.strategy import (
     MeanReversionParameters,
     MomentumParameters,
     RiskControls,
-    StrategyStatusEnum,
-    StrategyTypeEnum,
     TradingStrategyDocument,
 )
 
+
+BEANIE_MODELS = [
+    TradingStrategyDocument,
+    TradeOrderDocument,
+    MarketDataDocument,
+    PortfolioPositionDocument,
+    PerformanceMetricsDocument,
+    TradingSessionDocument,
+]
 __all__ = [
     'ArbitrageParameters',
     'MarketDataDocument',
@@ -29,19 +42,8 @@ __all__ = [
     'PortfolioPositionDocument',
     'RiskControls',
     'StrategyStatusEnum',
-    # Enums
     'StrategyTypeEnum',
     'TradeOrderDocument',
     'TradingSessionDocument',
-    # Models
     'TradingStrategyDocument',
-]
-
-BEANIE_MODELS = [
-    TradingStrategyDocument,
-    TradeOrderDocument,
-    MarketDataDocument,
-    PortfolioPositionDocument,
-    PerformanceMetricsDocument,
-    TradingSessionDocument,
 ]

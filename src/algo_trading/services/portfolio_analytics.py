@@ -7,7 +7,12 @@ from decimal import Decimal
 from datetime import datetime
 
 from algo_trading.enums import OrderSideEnum
-from src.algo_trading.adapters.models import TradingStrategyDocument, StrategyStatusEnum, TradeOrderDocument, OrderStatusEnum
+from src.algo_trading.adapters.models import (
+    TradingStrategyDocument,
+    StrategyStatusEnum,
+    TradeOrderDocument,
+    OrderStatusEnum,
+)
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import PortfolioSummaryResponseSchema
 
 
@@ -81,6 +86,7 @@ class PortfolioAnalytics:
                 losing_trades += 1
 
         win_rate = Decimal('0')
+        max_traders = 10
         if total_trades > 0:
             win_rate = Decimal(str(winning_trades)) / Decimal(str(total_trades))
 
@@ -88,7 +94,7 @@ class PortfolioAnalytics:
         total_return = total_pnl / Decimal('100000') if total_value > 0 else Decimal('0')
 
         sharpe_ratio = Decimal('0')
-        if total_trades > 10 and total_return > 0:
+        if total_trades > max_traders and total_return > 0:
             sharpe_ratio = total_return * Decimal('2')
 
         return PortfolioSummaryResponseSchema(

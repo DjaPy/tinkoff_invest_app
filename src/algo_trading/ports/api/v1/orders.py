@@ -12,7 +12,8 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from src.algo_trading.adapters.models.order import OrderStatusEnum, TradeOrderDocument
+from src.algo_trading.enums import OrderStatusEnum
+from src.algo_trading.adapters.models.order import TradeOrderDocument
 
 orders_router = APIRouter(prefix='/api/v1/orders', tags=['Trade Orders'])
 
