@@ -1,0 +1,5 @@
+### GET HISTORY DATA
+GET https://{{url_tinkof_invest}}/history-data?figi=TCS10A0JKQU8&year=2023/
+Authorization: Bearer {{token}}
+
+

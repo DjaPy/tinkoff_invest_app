@@ -1,0 +1,822 @@
+openapi: 3.0.3
+info:
+  title: Algorithmic Trading API - Analytics
+  description: API endpoints for performance analytics and metrics
+  version: 1.0.0
+  contact:
+    name: Tinkoff Invest App
+    email: djapy@yandex.ru
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Development server
+
+paths:
+  /analytics/strategies/{strategy_id}/performance:
+    get:
+      summary: Get strategy performance metrics
+      description: Retrieve performance analytics for a specific trading strategy
+      tags:
+        - Performance Analytics
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique strategy identifier
+        - name: period
+          in: query
+          schema:
+            $ref: '#/components/schemas/AnalyticsPeriod'
+          description: Time period for analytics calculation
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date for custom period (required if period=custom)
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date for custom period (required if period=custom)
+      responses:
+        '200':
+          description: Strategy performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PerformanceMetrics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/strategies/{strategy_id}/trades:
+    get:
+      summary: Get strategy trade analytics
+      description: Retrieve detailed trade analytics and statistics for a strategy
+      tags:
+        - Performance Analytics
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique strategy identifier
+        - name: period
+          in: query
+          schema:
+            $ref: '#/components/schemas/AnalyticsPeriod'
+          description: Time period for analytics calculation
+        - name: from_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: Start date for custom period
+        - name: to_date
+          in: query
+          schema:
+            type: string
+            format: date
+          description: End date for custom period
+      responses:
+        '200':
+          description: Strategy trade analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TradeAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/strategies/{strategy_id}/drawdown:
+    get:
+      summary: Get strategy drawdown analysis
+      description: Retrieve drawdown periods and risk analysis for a strategy
+      tags:
+        - Performance Analytics
+      parameters:
+        - name: strategy_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: Unique strategy identifier
+        - name: period
+          in: query
+          schema:
+            $ref: '#/components/schemas/AnalyticsPeriod'
+          description: Time period for drawdown analysis
+      responses:
+        '200':
+          description: Strategy drawdown analysis
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DrawdownAnalysis'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/portfolio/summary:
+    get:
+      summary: Get portfolio summary
+      description: Retrieve overall portfolio performance across all strategies
+      tags:
+        - Portfolio Analytics
+      parameters:
+        - name: period
+          in: query
+          schema:
+            $ref: '#/components/schemas/AnalyticsPeriod'
+          description: Time period for analytics calculation
+      responses:
+        '200':
+          description: Portfolio performance summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortfolioSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/market-data/{instrument}:
+    get:
+      summary: Get market data analytics
+      description: Retrieve market data and technical indicators for an instrument
+      tags:
+        - Market Analytics
+      parameters:
+        - name: instrument
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Trading instrument identifier (ticker/FIGI)
+        - name: timeframe
+          in: query
+          schema:
+            $ref: '#/components/schemas/Timeframe'
+          description: Data timeframe for analytics
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: Maximum number of data points to return
+      responses:
+        '200':
+          description: Market data with technical indicators
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarketDataAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /analytics/backtest:
+    post:
+      summary: Run strategy backtest
+      description: Run historical backtest for a trading strategy configuration
+      tags:
+        - Backtesting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BacktestRequest'
+      responses:
+        '200':
+          description: Backtest results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BacktestResults'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    PerformanceMetrics:
+      type: object
+      properties:
+        metrics_id:
+          type: string
+          format: uuid
+          description: Unique metrics identifier
+        strategy_id:
+          type: string
+          format: uuid
+          description: Reference to strategy
+        period_start:
+          type: string
+          format: date-time
+          description: Performance period start
+        period_end:
+          type: string
+          format: date-time
+          description: Performance period end
+        total_return:
+          type: number
+          format: decimal
+          description: Total return percentage
+        annualized_return:
+          type: number
+          format: decimal
+          description: Annualized return percentage
+        sharpe_ratio:
+          type: number
+          format: decimal
+          description: Risk-adjusted return measure
+        max_drawdown:
+          type: number
+          format: decimal
+          description: Maximum peak-to-trough decline
+        volatility:
+          type: number
+          format: decimal
+          description: Return volatility (standard deviation)
+        win_rate:
+          type: number
+          format: decimal
+          description: Percentage of profitable trades
+        profit_factor:
+          type: number
+          format: decimal
+          description: Gross profit / gross loss ratio
+        trade_count:
+          type: integer
+          description: Number of trades in period
+          minimum: 0
+        calculated_at:
+          type: string
+          format: date-time
+          description: Metrics calculation timestamp
+      required:
+        - metrics_id
+        - strategy_id
+        - period_start
+        - period_end
+        - total_return
+        - annualized_return
+        - sharpe_ratio
+        - max_drawdown
+        - volatility
+        - win_rate
+        - profit_factor
+        - trade_count
+        - calculated_at
+
+    TradeAnalytics:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+          format: uuid
+          description: Reference to strategy
+        period_start:
+          type: string
+          format: date-time
+          description: Analysis period start
+        period_end:
+          type: string
+          format: date-time
+          description: Analysis period end
+        total_trades:
+          type: integer
+          description: Total number of trades
+          minimum: 0
+        winning_trades:
+          type: integer
+          description: Number of profitable trades
+          minimum: 0
+        losing_trades:
+          type: integer
+          description: Number of losing trades
+          minimum: 0
+        avg_win:
+          type: number
+          format: decimal
+          description: Average winning trade amount
+        avg_loss:
+          type: number
+          format: decimal
+          description: Average losing trade amount
+        largest_win:
+          type: number
+          format: decimal
+          description: Largest winning trade
+        largest_loss:
+          type: number
+          format: decimal
+          description: Largest losing trade
+        avg_trade_duration:
+          type: number
+          format: decimal
+          description: Average trade duration in hours
+        total_commission:
+          type: number
+          format: decimal
+          description: Total commission paid
+          minimum: 0
+      required:
+        - strategy_id
+        - period_start
+        - period_end
+        - total_trades
+        - winning_trades
+        - losing_trades
+        - avg_win
+        - avg_loss
+        - largest_win
+        - largest_loss
+        - avg_trade_duration
+        - total_commission
+
+    DrawdownAnalysis:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+          format: uuid
+          description: Reference to strategy
+        max_drawdown:
+          type: number
+          format: decimal
+          description: Maximum drawdown percentage
+        max_drawdown_duration:
+          type: number
+          format: decimal
+          description: Longest drawdown period in days
+        current_drawdown:
+          type: number
+          format: decimal
+          description: Current drawdown percentage
+        drawdown_periods:
+          type: array
+          items:
+            $ref: '#/components/schemas/DrawdownPeriod'
+          description: Historical drawdown periods
+        recovery_factor:
+          type: number
+          format: decimal
+          description: Net profit / max drawdown ratio
+      required:
+        - strategy_id
+        - max_drawdown
+        - max_drawdown_duration
+        - current_drawdown
+        - drawdown_periods
+        - recovery_factor
+
+    DrawdownPeriod:
+      type: object
+      properties:
+        start_date:
+          type: string
+          format: date-time
+          description: Drawdown period start
+        end_date:
+          type: string
+          format: date-time
+          description: Drawdown period end (null if ongoing)
+          nullable: true
+        peak_value:
+          type: number
+          format: decimal
+          description: Portfolio value at peak
+        trough_value:
+          type: number
+          format: decimal
+          description: Portfolio value at trough
+        drawdown_percent:
+          type: number
+          format: decimal
+          description: Drawdown percentage
+        duration_days:
+          type: number
+          format: decimal
+          description: Drawdown duration in days
+      required:
+        - start_date
+        - peak_value
+        - trough_value
+        - drawdown_percent
+        - duration_days
+
+    PortfolioSummary:
+      type: object
+      properties:
+        total_value:
+          type: number
+          format: decimal
+          description: Total portfolio market value
+        total_pnl:
+          type: number
+          format: decimal
+          description: Total unrealized P&L
+        daily_pnl:
+          type: number
+          format: decimal
+          description: Today's P&L
+        total_return:
+          type: number
+          format: decimal
+          description: Total portfolio return percentage
+        active_strategies:
+          type: integer
+          description: Number of active strategies
+          minimum: 0
+        total_positions:
+          type: integer
+          description: Number of open positions
+          minimum: 0
+        cash_balance:
+          type: number
+          format: decimal
+          description: Available cash balance
+        strategy_breakdown:
+          type: array
+          items:
+            $ref: '#/components/schemas/StrategyBreakdown'
+          description: Performance breakdown by strategy
+      required:
+        - total_value
+        - total_pnl
+        - daily_pnl
+        - total_return
+        - active_strategies
+        - total_positions
+        - cash_balance
+        - strategy_breakdown
+
+    StrategyBreakdown:
+      type: object
+      properties:
+        strategy_id:
+          type: string
+          format: uuid
+          description: Strategy identifier
+        strategy_name:
+          type: string
+          description: Strategy name
+        market_value:
+          type: number
+          format: decimal
+          description: Strategy market value
+        pnl:
+          type: number
+          format: decimal
+          description: Strategy P&L
+        return_percent:
+          type: number
+          format: decimal
+          description: Strategy return percentage
+        status:
+          type: string
+          description: Strategy status
+      required:
+        - strategy_id
+        - strategy_name
+        - market_value
+        - pnl
+        - return_percent
+        - status
+
+    MarketDataAnalytics:
+      type: object
+      properties:
+        instrument:
+          type: string
+          description: Trading instrument identifier
+        timeframe:
+          $ref: '#/components/schemas/Timeframe'
+        data_points:
+          type: array
+          items:
+            $ref: '#/components/schemas/MarketDataPoint'
+          description: Historical market data with indicators
+        summary:
+          $ref: '#/components/schemas/MarketSummary'
+      required:
+        - instrument
+        - timeframe
+        - data_points
+        - summary
+
+    MarketDataPoint:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          description: Data point timestamp
+        price:
+          type: number
+          format: decimal
+          description: Price at timestamp
+          minimum: 0
+        volume:
+          type: integer
+          description: Trading volume
+          minimum: 0
+        indicators:
+          type: object
+          description: Technical indicators (RSI, MACD, etc.)
+          additionalProperties:
+            type: number
+            format: decimal
+      required:
+        - timestamp
+        - price
+        - volume
+        - indicators
+
+    MarketSummary:
+      type: object
+      properties:
+        current_price:
+          type: number
+          format: decimal
+          description: Current market price
+          minimum: 0
+        price_change:
+          type: number
+          format: decimal
+          description: Price change from previous close
+        price_change_percent:
+          type: number
+          format: decimal
+          description: Price change percentage
+        volatility:
+          type: number
+          format: decimal
+          description: Price volatility measure
+        avg_volume:
+          type: number
+          format: decimal
+          description: Average trading volume
+      required:
+        - current_price
+        - price_change
+        - price_change_percent
+        - volatility
+        - avg_volume
+
+    BacktestRequest:
+      type: object
+      properties:
+        strategy_config:
+          type: object
+          description: Strategy configuration for backtesting
+          additionalProperties: true
+        start_date:
+          type: string
+          format: date
+          description: Backtest start date
+        end_date:
+          type: string
+          format: date
+          description: Backtest end date
+        initial_capital:
+          type: number
+          format: decimal
+          description: Initial capital for backtesting
+          minimum: 0
+        instruments:
+          type: array
+          items:
+            type: string
+          description: Instruments to include in backtest
+      required:
+        - strategy_config
+        - start_date
+        - end_date
+        - initial_capital
+        - instruments
+
+    BacktestResults:
+      type: object
+      properties:
+        backtest_id:
+          type: string
+          format: uuid
+          description: Unique backtest identifier
+        strategy_config:
+          type: object
+          description: Strategy configuration used
+          additionalProperties: true
+        period_start:
+          type: string
+          format: date
+          description: Backtest period start
+        period_end:
+          type: string
+          format: date
+          description: Backtest period end
+        initial_capital:
+          type: number
+          format: decimal
+          description: Initial capital used
+        final_value:
+          type: number
+          format: decimal
+          description: Final portfolio value
+        total_return:
+          type: number
+          format: decimal
+          description: Total return percentage
+        sharpe_ratio:
+          type: number
+          format: decimal
+          description: Sharpe ratio
+        max_drawdown:
+          type: number
+          format: decimal
+          description: Maximum drawdown
+        total_trades:
+          type: integer
+          description: Total number of trades
+        win_rate:
+          type: number
+          format: decimal
+          description: Winning trade percentage
+        daily_returns:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              return:
+                type: number
+                format: decimal
+          description: Daily return series
+        trade_history:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date-time
+              instrument:
+                type: string
+              side:
+                type: string
+              quantity:
+                type: number
+                format: decimal
+              price:
+                type: number
+                format: decimal
+              pnl:
+                type: number
+                format: decimal
+          description: Individual trade records
+      required:
+        - backtest_id
+        - strategy_config
+        - period_start
+        - period_end
+        - initial_capital
+        - final_value
+        - total_return
+        - sharpe_ratio
+        - max_drawdown
+        - total_trades
+        - win_rate
+        - daily_returns
+        - trade_history
+
+    AnalyticsPeriod:
+      type: string
+      enum:
+        - 1d
+        - 7d
+        - 30d
+        - 90d
+        - 1y
+        - ytd
+        - all
+        - custom
+      description: Time period for analytics calculation
+
+    Timeframe:
+      type: string
+      enum:
+        - 1m
+        - 5m
+        - 15m
+        - 1h
+        - 4h
+        - 1d
+        - 1w
+      description: Market data timeframe
+
+    ErrorResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Error type identifier
+        title:
+          type: string
+          description: Human-readable error title
+        status:
+          type: integer
+          description: HTTP status code
+        detail:
+          type: string
+          description: Detailed error description
+        instance:
+          type: string
+          description: Request path where error occurred
+      required:
+        - type
+        - title
+        - status
+
+  responses:
+    BadRequest:
+      description: Bad request - invalid input
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+security:
+  - BearerAuth: []

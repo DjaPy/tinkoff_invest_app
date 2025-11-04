@@ -2,14 +2,24 @@
 
 import typing
 from http import HTTPStatus
-from typing import Any, Optional, TypedDict
+from typing import Any, Optional
 
 from fastapi import Response, status
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 from starlette.background import BackgroundTask
 
-__all__ = ['Problem', 'ProblemResponse', 'ValidationError', 'Unauthorized', 'Forbidden', 'NotFound',
-           'UnprocessableEntity', 'InternalServerError']
+__all__ = [
+    'Forbidden',
+    'InternalServerError',
+    'NotFound',
+    'Problem',
+    'ProblemResponse',
+    'Unauthorized',
+    'UnprocessableEntity',
+    'ValidationError',
+]
+
+from typing_extensions import Annotated, TypedDict
 
 
 class Problem(BaseModel):
@@ -18,14 +28,12 @@ class Problem(BaseModel):
     status: Optional[HTTPStatus] = None
     detail: Optional[Any] = None
     instance: Optional[str] = None
-    invalid_params: Optional[Any] = None
+    invalid_params: Annotated[Any | None, 'invalid-params'] = None
 
-    class Config:
-        fields = {'invalid_params': 'invalid-params'}
-        allow_population_by_field_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
-    @root_validator
-    def title_without_type(cls, values: dict[str, Any]) -> dict[str, Any]:  # pylint: disable=no-self-argument
+    @model_validator(mode='before')
+    def title_without_type(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
         type_ = values.get('type')
         title = values.get('title')
         status = values.get('status')
@@ -40,53 +48,55 @@ class ValidationError(Problem):
         name: str
         reason: str
 
-    type: str = Field('validation-error', const=True)
-    title: str = Field("Your request parameters didn't validate.", const=True)
-    status: HTTPStatus = Field(HTTPStatus.BAD_REQUEST, const=True)
+    type: typing.Literal['validation-error'] = 'validation-error'
+    title: typing.Literal["Your request parameters didn't validate."] = "Your request parameters didn't validate."
+    status: typing.Literal[HTTPStatus.BAD_REQUEST] = HTTPStatus.BAD_REQUEST
     invalid_params: list[Param]
 
 
 class Unauthorized(Problem):
-    type: str = Field('unauthorized', const=True)
-    title: str = Field(
-        'The request has not been applied because it lacks valid authentication credentials for the target resource.',
-        const=True)
-    status: HTTPStatus = Field(HTTPStatus.UNAUTHORIZED, const=True)
+    type: typing.Literal['unauthorized'] = 'unauthorized'
+    title: typing.Literal[
+        'The request has not been applied because it lacks valid authentication credentials for the target resource.'
+    ] = 'The request has not been applied because it lacks valid authentication credentials for the target resource.'
+    status: typing.Literal[HTTPStatus.UNAUTHORIZED] = HTTPStatus.UNAUTHORIZED
 
 
 class Forbidden(Problem):
-    type: str = Field('forbidden', const=True)
-    title: str = Field('The server understood the request but refuses to authorize it.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.FORBIDDEN, const=True)
+    type: typing.Literal['forbidden'] = 'forbidden'
+    title: typing.Literal[
+        'The server understood the request but refuses to authorize it.'
+    ] = 'The server understood the request but refuses to authorize it.'
+    status: typing.Literal[HTTPStatus.FORBIDDEN] = HTTPStatus.FORBIDDEN
 
 
 class NotFound(Problem):
-    type: str = Field('not-found', const=True)
-    title: str = Field('Requested resource is not available.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.NOT_FOUND, const=True)
+    type: typing.Literal['not-found'] = 'not-found'
+    title: typing.Literal['Requested resource is not available.'] = 'Requested resource is not available.'
+    status: typing.Literal[HTTPStatus.NOT_FOUND] = HTTPStatus.NOT_FOUND
 
 
 class UnprocessableEntity(Problem):
     type: str
-    status: HTTPStatus = Field(HTTPStatus.UNPROCESSABLE_ENTITY, const=True)
+    status: typing.Literal[HTTPStatus.UNPROCESSABLE_ENTITY] = HTTPStatus.UNPROCESSABLE_ENTITY
 
 
 class InternalServerError(Problem):
-    type: str = Field('internal-server-error', const=True)
-    title: str = Field('Internal server error.', const=True)
-    status: HTTPStatus = Field(HTTPStatus.INTERNAL_SERVER_ERROR, const=True)
+    type: typing.Literal['internal-server-error'] = 'internal-server-error'
+    title: typing.Literal['Internal server error.'] = 'Internal server error.'
+    status: typing.Literal[HTTPStatus.INTERNAL_SERVER_ERROR] = HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 class ProblemResponse(Response):
     media_type = 'application/problem+json'
 
     def __init__(  # pylint: disable=too-many-arguments
-        self,
-        content: Problem,
-        status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
-        headers: typing.Optional[dict] = None,
-        media_type: typing.Optional[str] = None,
-        background: typing.Optional[BackgroundTask] = None,
+            self,
+            content: Problem,
+            status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR,
+            headers: typing.Optional[dict] = None,
+            media_type: typing.Optional[str] = None,
+            background: typing.Optional[BackgroundTask] = None,
     ) -> None:
         if isinstance(content, Problem):
             status_code = content.status.value if content.status else status_code
@@ -97,4 +107,4 @@ class ProblemResponse(Response):
         if not isinstance(content, Problem):
             raise TypeError('the content must be Problem')
 
-        return content.json(exclude_none=True, by_alias=True).encode('utf-8')
+        return content.model_dump_json(exclude_none=True, by_alias=True).encode('utf-8')

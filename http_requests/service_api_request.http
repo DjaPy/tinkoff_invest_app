@@ -1,0 +1,21 @@
+
+
+
+### Создать аккаунт в песочнице
+########################
+POST {{url}}/account/
+Accept: application/json
+Content-Type: application/json
+
+
+### Поучить аккаунты
+########################
+GET {{url}}/account/
+Content-Type: application/json
+
+
+### Поучить аккаунт по id
+########################
+#POST {{url}}/account/9db8b029-1cb0-4cc4-91fa-10fde35c7998/
+#Accept: application/json
+#Content-Type: application/json

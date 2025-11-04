@@ -4,7 +4,6 @@ from typing import Any, Iterable, Type
 
 import aiohttp
 from aiohttp import hdrs
-
 from aiohttp.http import SERVER_SOFTWARE
 from prometheus_client import Counter, Histogram
 
@@ -12,17 +11,22 @@ from prometheus_client import Counter, Histogram
 class TraceConfigWithHeaderUserAgent(aiohttp.TraceConfig):
     labelnames = ['http_client_method']
     HTTP_CLIENT_STARTED_TOTAL = Counter(
-        'http_client_started_total', 'Total number of HTTPs started on the client.', labelnames)
-    HTTP_CLIENT_ERRORS_TOTAL = Counter(
-        'http_client_errors_total', 'Total number of errors on the client.', labelnames)
-    labelnames = ['http_client_method', 'http_client_status']
+        'http_client_started_total',
+        'Total number of HTTPs started on the client.',
+        labelnames,
+    )
+    HTTP_CLIENT_ERRORS_TOTAL = Counter('http_client_errors_total', 'Total number of errors on the client.', labelnames)
     HTTP_CLIENT_HANDLED_TOTAL = Counter(
-        'http_client_handled_total', 'Total number of HTTPs completed by the client, regardless of success or failure.',
-        labelnames)
+        'http_client_handled_total',
+        'Total number of HTTPs completed by the client, regardless of success or failure.',
+        labelnames,
+    )
     HTTP_CLIENT_HANDLING_SECONDS = Histogram(
         'http_client_handling_seconds',
         'Histogram of response latency (seconds) of the HTTP until it is finished by the application.',
-        labelnames, buckets=[.005, .01, .025, .05, .1, .25, .5, 1, 2.5, 5, 10])
+        labelnames,
+        buckets=[0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10],
+    )
 
     async def on_request_start_trace(self, session: Any, trace_config_ctx: Any, params: Any) -> None:
         trace_config_ctx.start = asyncio.get_event_loop().time()
@@ -38,10 +42,10 @@ class TraceConfigWithHeaderUserAgent(aiohttp.TraceConfig):
         self.HTTP_CLIENT_ERRORS_TOTAL.labels(params.method).inc()
 
     def __init__(
-            self,
-            user_agent: str = SERVER_SOFTWARE,
-            trace_config_ctx_factory: Type[SimpleNamespace] = SimpleNamespace,
-    ):
+        self,
+        user_agent: str = SERVER_SOFTWARE,
+        trace_config_ctx_factory: Type[SimpleNamespace] = SimpleNamespace,
+    ) -> None:
         super().__init__(trace_config_ctx_factory)
         self._user_agent = user_agent
         self.on_request_start.append(self.on_request_start_trace)
@@ -52,7 +56,7 @@ class TraceConfigWithHeaderUserAgent(aiohttp.TraceConfig):
 class ClientRequest(aiohttp.ClientRequest):
     _user_agent: str = SERVER_SOFTWARE
 
-    def update_auto_headers(self, skip_auto_headers: Iterable[str]) -> None:
+    def update_auto_headers(self, skip_auto_headers: Iterable[str] | None) -> None:
         super().update_auto_headers(skip_auto_headers)
 
         self.headers[hdrs.USER_AGENT] = self._user_agent
