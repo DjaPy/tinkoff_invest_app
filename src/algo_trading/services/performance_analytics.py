@@ -3,12 +3,18 @@
 Orchestrates performance metrics calculation and storage.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models import OrderSide, OrderStatus, PerformanceMetrics, TradeOrder, TradingSession
+from src.algo_trading.adapters.models import (
+    OrderSideEnum,
+    OrderStatusEnum,
+    PerformanceMetricsDocument,
+    TradeOrderDocument,
+    TradingSessionDocument,
+)
 from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, Trade
 
 
@@ -23,7 +29,10 @@ class PerformanceAnalytics:
     Orchestrates domain logic for analytics and persists results.
     """
 
-    def __init__(self, calculator: PerformanceCalculator | None = None) -> None:
+    def __init__(
+        self,
+        calculator: PerformanceCalculator | None = None
+    ) -> None:
         """
         Initialize PerformanceAnalytics.
 
@@ -37,17 +46,24 @@ class PerformanceAnalytics:
         strategy_id: UUID,
         period_start: datetime,
         period_end: datetime,
-    ) -> PerformanceMetrics:
+        cache_ttl_hours: int = 1,
+        force_recalculate: bool = False,
+    ) -> PerformanceMetricsDocument:
         """
-        Calculate and store performance metrics for strategy.
+        Calculate and store performance metrics for strategy with smart caching.
+
+        Metrics are cached to avoid expensive recalculations. Use cache_ttl_hours to control
+        how long cached metrics are considered fresh. Set force_recalculate=True to bypass cache.
 
         Args:
             strategy_id: Strategy UUID
             period_start: Analysis period start
             period_end: Analysis period end
+            cache_ttl_hours: Cache time-to-live in hours (default: 1 hour)
+            force_recalculate: If True, bypass cache and recalculate (default: False)
 
         Returns:
-            Calculated PerformanceMetrics
+            Calculated PerformanceMetrics (from cache or freshly calculated)
 
         Raises:
             PerformanceAnalyticsError: If calculation fails
@@ -55,42 +71,48 @@ class PerformanceAnalytics:
         if period_end <= period_start:
             raise PerformanceAnalyticsError('period_end must be after period_start')
 
-        # Get sessions in period
-        sessions = await TradingSession.find(
-            TradingSession.strategy_id == strategy_id,
-            TradingSession.session_start >= period_start,
-            TradingSession.session_start <= period_end,
+        if not force_recalculate:
+            cache_threshold = datetime.now() - timedelta(hours=cache_ttl_hours)
+
+            cached_metrics = await PerformanceMetricsDocument.find_one(
+                PerformanceMetricsDocument.strategy_id == strategy_id,
+                PerformanceMetricsDocument.period_start == period_start,
+                PerformanceMetricsDocument.period_end == period_end,
+                PerformanceMetricsDocument.calculated_at >= cache_threshold,
+            )
+
+            if cached_metrics:
+                return cached_metrics
+
+        sessions = await TradingSessionDocument.find(
+            TradingSessionDocument.strategy_id == strategy_id,
+            TradingSessionDocument.session_start >= period_start,
+            TradingSessionDocument.session_start <= period_end,
         ).to_list()
 
         if not sessions:
             raise PerformanceAnalyticsError(f'No trading sessions found for strategy {strategy_id} in period')
 
-        # Calculate capital and returns
         starting_capital = sessions[0].starting_capital
         ending_capital = sessions[-1].ending_capital or sessions[-1].starting_capital
 
-        # Get all orders
-        orders = await TradeOrder.find(
-            TradeOrder.strategy_id == strategy_id,
-            TradeOrder.filled_at is not None,
-            TradeOrder.filled_at >= period_start,  # type: ignore[operator]
-            TradeOrder.filled_at <= period_end,  # type: ignore[operator]
-            TradeOrder.status == OrderStatus.FILLED,
+        orders = await TradeOrderDocument.find(
+            TradeOrderDocument.strategy_id == strategy_id,
+            TradeOrderDocument.filled_at != None,
+            TradeOrderDocument.filled_at >= period_start,  # type: ignore[operator]
+            TradeOrderDocument.filled_at <= period_end,  # type: ignore[operator]
+            TradeOrderDocument.status == OrderStatusEnum.FILLED,
         ).to_list()
 
         if not orders:
             raise PerformanceAnalyticsError('No filled orders found in period')
 
-        # Build equity curve and returns
         equity_curve, daily_returns = await self._build_equity_curve(orders, starting_capital)
 
-        # Build trade list
         trades = await self._build_trade_list(orders)
 
-        # Calculate days
         days = (period_end - period_start).days
 
-        # Calculate metrics using domain logic
         perf_result = self.calculator.calculate_performance(
             starting_capital=starting_capital,
             ending_capital=ending_capital,
@@ -100,8 +122,7 @@ class PerformanceAnalytics:
             days=days,
         )
 
-        # Persist metrics
-        metrics = PerformanceMetrics(
+        metrics = PerformanceMetricsDocument(
             strategy_id=strategy_id,
             period_start=period_start,
             period_end=period_end,
@@ -123,7 +144,7 @@ class PerformanceAnalytics:
 
         return metrics
 
-    async def get_latest_metrics(self, strategy_id: UUID) -> PerformanceMetrics | None:
+    async def get_latest_metrics(self, strategy_id: UUID) -> PerformanceMetricsDocument | None:
         """
         Get most recent performance metrics for strategy.
 
@@ -134,7 +155,7 @@ class PerformanceAnalytics:
             Latest PerformanceMetrics or None
         """
         metrics = (
-            await PerformanceMetrics.find(PerformanceMetrics.strategy_id == strategy_id)
+            await PerformanceMetricsDocument.find(PerformanceMetricsDocument.strategy_id == strategy_id)
             .sort('-period_end')
             .limit(1)
             .to_list()
@@ -142,7 +163,7 @@ class PerformanceAnalytics:
 
         return metrics[0] if metrics else None
 
-    async def get_metrics_history(self, strategy_id: UUID, limit: int = 30) -> list[PerformanceMetrics]:
+    async def get_metrics_history(self, strategy_id: UUID, limit: int = 30) -> list[PerformanceMetricsDocument]:
         """
         Get performance metrics history for strategy.
 
@@ -154,13 +175,13 @@ class PerformanceAnalytics:
             List of PerformanceMetrics (newest first)
         """
         return (
-            await PerformanceMetrics.find(PerformanceMetrics.strategy_id == strategy_id)
+            await PerformanceMetricsDocument.find(PerformanceMetricsDocument.strategy_id == strategy_id)
             .sort('-period_end')
             .limit(limit)
             .to_list()
         )
 
-    async def calculate_trailing_metrics(self, strategy_id: UUID, days: int = 30) -> PerformanceMetrics:
+    async def calculate_trailing_metrics(self, strategy_id: UUID, days: int = 30) -> PerformanceMetricsDocument:
         """
         Calculate trailing N-day performance metrics.
 
@@ -171,7 +192,7 @@ class PerformanceAnalytics:
         Returns:
             PerformanceMetrics for trailing period
         """
-        period_end = datetime.utcnow()
+        period_end = datetime.now(tz=UTC)
         period_start = period_end - timedelta(days=days)
 
         return await self.calculate_strategy_performance(
@@ -186,7 +207,7 @@ class PerformanceAnalytics:
 
     async def _build_equity_curve(
         self,
-        orders: list[TradeOrder],
+        orders: list[TradeOrderDocument],
         starting_capital: Decimal,
     ) -> tuple[list[Decimal], list[Decimal]]:
         """
@@ -204,8 +225,7 @@ class PerformanceAnalytics:
 
         current_capital = starting_capital
 
-        # Group orders by day (only filled orders)
-        orders_by_day: dict[str, list[TradeOrder]] = {}
+        orders_by_day: dict[str, list[TradeOrderDocument]] = {}
         sorted_order = sorted(
             [o for o in orders if o.filled_at is not None],
             key=lambda o: o.filled_at if o.filled_at else datetime.min,
@@ -218,7 +238,6 @@ class PerformanceAnalytics:
                 orders_by_day[day_key] = []
             orders_by_day[day_key].append(order)
 
-        # Calculate daily P&L
         for day_orders in orders_by_day.values():
             daily_pnl = Decimal('0')
 
@@ -228,7 +247,7 @@ class PerformanceAnalytics:
                 if order.filled_price is None:
                     continue
                 order_value = order.filled_price * order.filled_quantity
-                daily_pnl += order_value if order.side == OrderSide.SELL else -order_value
+                daily_pnl += order_value if order.side == OrderSideEnum.SELL else -order_value
                 daily_pnl -= order.commission
 
             current_capital += daily_pnl
@@ -239,7 +258,7 @@ class PerformanceAnalytics:
 
         return equity_curve, daily_returns
 
-    async def _build_trade_list(self, orders: list[TradeOrder]) -> list[Trade]:
+    async def _build_trade_list(self, orders: list[TradeOrderDocument]) -> list[Trade]:
         """
         Build trade list from orders for performance calculation.
 
@@ -280,7 +299,7 @@ class PerformanceAnalytics:
         Returns:
             Dictionary with trade analytics
         """
-        query: dict[str, Any] = {'strategy_id': strategy_id, 'status': OrderStatus.FILLED}
+        query: dict[str, Any] = {'strategy_id': strategy_id, 'status': OrderStatusEnum.FILLED}
 
         if period_start:
             query['filled_at'] = {'$gte': period_start}
@@ -293,7 +312,7 @@ class PerformanceAnalytics:
             else:
                 query['filled_at'] = {'$lte': period_end}
 
-        orders = await TradeOrder.find(query).to_list()
+        orders = await TradeOrderDocument.find(query).to_list()
 
         if not orders:
             return {

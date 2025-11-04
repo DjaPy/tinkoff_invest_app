@@ -7,7 +7,7 @@ from http import HTTPStatus
 
 import pytest
 
-from src.algo_trading.adapters.models import StrategyStatus
+from src.algo_trading.adapters.models import StrategyStatusEnum
 
 
 @pytest.mark.asyncio
@@ -53,7 +53,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         assert response.status == HTTPStatus.CREATED
         created = await response.json()
         strategy_id = created['strategy_id']
-        assert created['status'] == StrategyStatus.INACTIVE.value
+        assert created['status'] == StrategyStatusEnum.INACTIVE.value
 
     # Step 2: Start strategy
     async with client.post(
@@ -62,7 +62,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         started = await response.json()
-        assert started['status'] == StrategyStatus.ACTIVE.value
+        assert started['status'] == StrategyStatusEnum.ACTIVE.value
 
     # Step 3: Pause strategy
     async with client.post(
@@ -71,7 +71,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         paused = await response.json()
-        assert paused['status'] == StrategyStatus.PAUSED.value
+        assert paused['status'] == StrategyStatusEnum.PAUSED.value
 
     # Verify strategy is paused
     async with client.get(
@@ -80,7 +80,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         status = await response.json()
-        assert status['status'] == StrategyStatus.PAUSED.value
+        assert status['status'] == StrategyStatusEnum.PAUSED.value
 
     # Step 4: Resume strategy (start from paused)
     async with client.post(
@@ -89,7 +89,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         resumed = await response.json()
-        assert resumed['status'] == StrategyStatus.ACTIVE.value
+        assert resumed['status'] == StrategyStatusEnum.ACTIVE.value
 
     # Step 5: Stop strategy (emergency stop)
     async with client.post(
@@ -98,7 +98,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         stopped = await response.json()
-        assert stopped['status'] == StrategyStatus.STOPPED.value
+        assert stopped['status'] == StrategyStatusEnum.STOPPED.value
 
     # Verify final state
     async with client.get(
@@ -107,7 +107,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         final = await response.json()
-        assert final['status'] == StrategyStatus.STOPPED.value
+        assert final['status'] == StrategyStatusEnum.STOPPED.value
 
 
 @pytest.mark.asyncio

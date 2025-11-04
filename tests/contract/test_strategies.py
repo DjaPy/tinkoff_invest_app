@@ -9,7 +9,7 @@ from decimal import Decimal
 
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import RiskControls, StrategyType, TradingStrategy
+from src.algo_trading.adapters.models.strategy import RiskControls, StrategyTypeEnum, TradingStrategyDocument
 
 
 async def test_get_strategies_returns_strategy_list(client, config):
@@ -31,9 +31,9 @@ async def test_get_strategies_returns_strategy_list(client, config):
 async def test_get_strategies_validates_strategy_structure(client, config, mongo_connection):
     """Test GET /api/v1/strategies validates strategy structure (T040)"""
     # Create a test strategy in database
-    strategy = TradingStrategy(
+    strategy = TradingStrategyDocument(
         name='Test Momentum Strategy',
-        strategy_type=StrategyType.MOMENTUM,
+        strategy_type=StrategyTypeEnum.MOMENTUM,
         parameters={'lookback_period': 20, 'momentum_threshold': 0.02},
         risk_controls=RiskControls(max_position_size=10000.0, max_portfolio_value=50000.0, stop_loss_percent=0.02),
         created_by='test-user',
@@ -66,7 +66,7 @@ async def test_get_strategies_validates_strategy_structure(client, config, mongo
 async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection):
     """Test GET /api/v1/strategies returns empty list (T041)"""
     # Ensure database is clean
-    await TradingStrategy.delete_all()
+    await TradingStrategyDocument.delete_all()
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -93,9 +93,9 @@ async def test_get_strategies_unauthorized_without_token(client, config):
 async def test_get_strategies_validates_pydantic_model(client, config, mongo_connection, pydantic_generator_data):
     """Test GET /api/v1/strategies returns valid Pydantic models (T043)"""
     # Create test strategy
-    strategy = TradingStrategy(
+    strategy = TradingStrategyDocument(
         name='Pydantic Test Strategy',
-        strategy_type=StrategyType.MEAN_REVERSION,
+        strategy_type=StrategyTypeEnum.MEAN_REVERSION,
         parameters={'ma_period': Decimal('50'), 'std_threshold': Decimal('2.0')},
         risk_controls=RiskControls(
             max_position_size=Decimal('10000.0'),
@@ -117,7 +117,7 @@ async def test_get_strategies_validates_pydantic_model(client, config, mongo_con
         if data['strategies']:
             # Should be able to parse as TradingStrategy
             for strategy_data in data['strategies']:
-                validated_strategy = TradingStrategy(**strategy_data)
+                validated_strategy = TradingStrategyDocument(**strategy_data)
                 assert validated_strategy.name is not None
                 assert validated_strategy.strategy_type is not None
 

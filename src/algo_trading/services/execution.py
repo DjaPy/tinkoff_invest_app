@@ -6,7 +6,7 @@ Handles real order execution through Tinkoff Invest broker.
 from decimal import Decimal
 from uuid import UUID
 
-from src.algo_trading.adapters.models import OrderStatus, TradeOrder
+from src.algo_trading.adapters.models import OrderStatusEnum, TradeOrderDocument
 from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
 
 
@@ -55,7 +55,7 @@ class TinkoffExecutionService:
         except Exception as e:
             raise ExecutionError(f'Failed to get FIGI for {ticker}: {e}') from e
 
-    async def submit_order(self, order: TradeOrder) -> TradeOrder:
+    async def submit_order(self, order: TradeOrderDocument) -> TradeOrderDocument:
         """
         Submit order to Tinkoff Invest.
 
@@ -92,17 +92,17 @@ class TinkoffExecutionService:
 
             # Update order with external ID
             order.external_order_id = response['external_order_id']
-            order.update_status(OrderStatus.SUBMITTED)
+            order.update_status(OrderStatusEnum.SUBMITTED)
             await order.save()
 
             return order
         except Exception as e:
             # Mark order as rejected
-            order.update_status(OrderStatus.REJECTED)
+            order.update_status(OrderStatusEnum.REJECTED)
             await order.save()
             raise ExecutionError(f'Failed to submit order {order.order_id}: {e}') from e
 
-    async def cancel_order(self, order: TradeOrder) -> TradeOrder:
+    async def cancel_order(self, order: TradeOrderDocument) -> TradeOrderDocument:
         """
         Cancel order via Tinkoff Invest.
 
@@ -123,14 +123,14 @@ class TinkoffExecutionService:
             success = await self.client.cancel_order(order.external_order_id)
 
             if success:
-                order.update_status(OrderStatus.CANCELLED)
+                order.update_status(OrderStatusEnum.CANCELLED)
                 await order.save()
 
             return order
         except Exception as e:
             raise ExecutionError(f'Failed to cancel order {order.order_id}: {e}') from e
 
-    async def check_order_status(self, order: TradeOrder) -> OrderStatus:
+    async def check_order_status(self, order: TradeOrderDocument) -> OrderStatusEnum:
         """
         Check order status from Tinkoff.
 
@@ -154,7 +154,7 @@ class TinkoffExecutionService:
 
         return order.status
 
-    async def get_execution_price(self, order: TradeOrder) -> Decimal | None:
+    async def get_execution_price(self, order: TradeOrderDocument) -> Decimal | None:
         """
         Get execution price for filled order.
 
@@ -171,7 +171,7 @@ class TinkoffExecutionService:
             This is a placeholder. Full implementation would query
             Tinkoff API for execution details.
         """
-        if order.status != OrderStatus.FILLED:
+        if order.status != OrderStatusEnum.FILLED:
             return None
 
         if order.filled_price:

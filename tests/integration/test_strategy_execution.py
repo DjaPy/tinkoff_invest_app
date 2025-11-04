@@ -8,7 +8,7 @@ from http import HTTPStatus
 
 import pytest
 
-from src.algo_trading.adapters.models import StrategyStatus
+from src.algo_trading.adapters.models import StrategyStatusEnum
 
 
 @pytest.mark.asyncio
@@ -73,7 +73,7 @@ async def test_real_time_strategy_execution_and_risk_management(client, config, 
         strategy_status = await response.json()
 
         # Verify strategy is active
-        assert strategy_status['status'] == StrategyStatus.ACTIVE.value
+        assert strategy_status['status'] == StrategyStatusEnum.ACTIVE.value
         assert strategy_status['strategy_id'] == strategy_id
 
     # Step 3: Check orders (may be empty initially, but endpoint should work)
@@ -265,4 +265,4 @@ async def test_strategy_execution_with_disabled_risk_controls(client, config, mo
     ) as response:
         assert response.status == HTTPStatus.OK
         started = await response.json()
-        assert started['status'] == StrategyStatus.ACTIVE.value
+        assert started['status'] == StrategyStatusEnum.ACTIVE.value

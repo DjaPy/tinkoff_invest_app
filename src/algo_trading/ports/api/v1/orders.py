@@ -12,7 +12,7 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
-from src.algo_trading.adapters.models.order import OrderStatus, TradeOrder
+from src.algo_trading.adapters.models.order import OrderStatusEnum, TradeOrderDocument
 
 orders_router = APIRouter(prefix='/api/v1/orders', tags=['Trade Orders'])
 
@@ -21,7 +21,7 @@ orders_router = APIRouter(prefix='/api/v1/orders', tags=['Trade Orders'])
 class OrderListResponseSchema(BaseModel):
     """Response schema for listing orders."""
 
-    orders: list[TradeOrder] = Field(description='List of trade orders')
+    orders: list[TradeOrderDocument] = Field(description='List of trade orders')
     total: int = Field(ge=0, description='Total number of orders matching filters')
     limit: int = Field(ge=1, le=100, description='Request limit parameter')
     offset: int = Field(ge=0, description='Request offset parameter')
@@ -35,7 +35,7 @@ class OrderListResponseSchema(BaseModel):
 )
 async def list_orders(
     strategy_id: UUID | None = Query(None, description='Filter orders by strategy ID'),
-    status_filter: OrderStatus | None = Query(None, alias='status', description='Filter orders by status'),
+    status_filter: OrderStatusEnum | None = Query(None, alias='status', description='Filter orders by status'),
     from_date: datetime | None = Query(None, description='Filter orders from this date'),
     to_date: datetime | None = Query(None, description='Filter orders until this date'),
     limit: int = Query(50, ge=1, le=100, description='Maximum number of orders to return'),
@@ -71,7 +71,7 @@ async def list_orders(
     # TODO: Add date range filtering
     # TODO: Implement proper filtering with Beanie query builder
 
-    all_orders = await TradeOrder.find_all().to_list()
+    all_orders = await TradeOrderDocument.find_all().to_list()
 
     # Apply filters
     filtered_orders = all_orders
@@ -94,11 +94,11 @@ async def list_orders(
 
 @orders_router.get(
     '/{order_id}',
-    response_model=TradeOrder,
+    response_model=TradeOrderDocument,
     summary='Get order details',
     description='Retrieve detailed information about a specific trade order',
 )
-async def get_order(order_id: UUID) -> TradeOrder:
+async def get_order(order_id: UUID) -> TradeOrderDocument:
     """
     Get order by ID (T050).
 
@@ -112,7 +112,7 @@ async def get_order(order_id: UUID) -> TradeOrder:
         HTTPException 404: Order not found
         HTTPException 500: Internal server error
     """
-    order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+    order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
 
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Order {order_id} not found')
@@ -122,11 +122,11 @@ async def get_order(order_id: UUID) -> TradeOrder:
 
 @orders_router.post(
     '/{order_id}/cancel',
-    response_model=TradeOrder,
+    response_model=TradeOrderDocument,
     summary='Cancel trade order',
     description='Cancel a pending or submitted trade order',
 )
-async def cancel_order(order_id: UUID) -> TradeOrder:
+async def cancel_order(order_id: UUID) -> TradeOrderDocument:
     """
     Cancel a trade order (T051).
 
@@ -141,13 +141,13 @@ async def cancel_order(order_id: UUID) -> TradeOrder:
         HTTPException 409: Order cannot be cancelled (already filled or rejected)
         HTTPException 500: Internal server error
     """
-    order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+    order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
 
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Order {order_id} not found')
 
     # Check if order can be cancelled
-    if order.status in [OrderStatus.FILLED, OrderStatus.REJECTED, OrderStatus.CANCELLED]:
+    if order.status in [OrderStatusEnum.FILLED, OrderStatusEnum.REJECTED, OrderStatusEnum.CANCELLED]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f'Order cannot be cancelled. Current status: {order.status}',
@@ -155,7 +155,7 @@ async def cancel_order(order_id: UUID) -> TradeOrder:
 
     # Update order status to cancelled
     try:
-        order.update_status(OrderStatus.CANCELLED)
+        order.update_status(OrderStatusEnum.CANCELLED)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 

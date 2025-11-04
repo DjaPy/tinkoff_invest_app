@@ -16,7 +16,7 @@ from uuid import uuid4
 import pytest
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import StrategyStatus, TradingStrategy
+from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, TradingStrategyDocument
 
 # ==================== START STRATEGY TESTS (T009) ====================
 
@@ -37,9 +37,9 @@ async def test_start_strategy_activates_inactive_strategy(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         assert strategy.strategy_id == strategy_id
-        assert strategy.status == StrategyStatus.ACTIVE
+        assert strategy.status == StrategyStatusEnum.ACTIVE
         assert strategy.updated_at is not None
 
 
@@ -111,9 +111,9 @@ async def test_stop_strategy_halts_active_strategy(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         assert strategy.strategy_id == strategy_id
-        assert strategy.status == StrategyStatus.STOPPED
+        assert strategy.status == StrategyStatusEnum.STOPPED
         assert strategy.updated_at is not None
 
 
@@ -130,8 +130,8 @@ async def test_stop_strategy_closes_positions(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        strategy = TradingStrategy(**data)
-        assert strategy.status == StrategyStatus.STOPPED
+        strategy = TradingStrategyDocument(**data)
+        assert strategy.status == StrategyStatusEnum.STOPPED
         # Implementation should handle position closing
 
 
@@ -182,9 +182,9 @@ async def test_pause_strategy_temporarily_halts_execution(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         assert strategy.strategy_id == strategy_id
-        assert strategy.status == StrategyStatus.PAUSED
+        assert strategy.status == StrategyStatusEnum.PAUSED
         assert strategy.updated_at is not None
 
 
@@ -201,8 +201,8 @@ async def test_pause_strategy_keeps_positions_open(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        strategy = TradingStrategy(**data)
-        assert strategy.status == StrategyStatus.PAUSED
+        strategy = TradingStrategyDocument(**data)
+        assert strategy.status == StrategyStatusEnum.PAUSED
         # Implementation should NOT close positions (unlike stop)
 
 
@@ -239,7 +239,7 @@ async def test_pause_strategy_unauthorized(client, config):
 
 @pytest.mark.parametrize(
     'action,expected_status',
-    [('start', StrategyStatus.ACTIVE), ('stop', StrategyStatus.STOPPED), ('pause', StrategyStatus.PAUSED)],
+    [('start', StrategyStatusEnum.ACTIVE), ('stop', StrategyStatusEnum.STOPPED), ('pause', StrategyStatusEnum.PAUSED)],
 )
 @pytest.mark.asyncio
 async def test_lifecycle_actions_update_status_correctly(client, config, action, expected_status):
@@ -252,5 +252,5 @@ async def test_lifecycle_actions_update_status_correctly(client, config, action,
     ) as response:
         if response.status == status.HTTP_200_OK:
             data = await response.json()
-            strategy = TradingStrategy(**data)
+            strategy = TradingStrategyDocument(**data)
             assert strategy.status == expected_status

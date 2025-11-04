@@ -17,13 +17,13 @@ import pytest
 from pydantic import BaseModel, Field
 from starlette import status
 
-from src.algo_trading.adapters.models.position import PortfolioPosition
+from src.algo_trading.adapters.models.position import PortfolioPositionDocument
 
 
 class PositionListResponse(BaseModel):
     """Response schema for GET /api/v1/positions."""
 
-    positions: list[PortfolioPosition] = Field(description='List of portfolio positions')
+    positions: list[PortfolioPositionDocument] = Field(description='List of portfolio positions')
     total_value: Decimal = Field(ge=0, description='Total portfolio market value')
     total_pnl: Decimal = Field(description='Total unrealized P&L')
 
@@ -185,7 +185,7 @@ async def test_get_position_by_id_returns_position_details(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        position = PortfolioPosition(**data)
+        position = PortfolioPositionDocument(**data)
         assert position.position_id == position_id
         assert position.strategy_id is not None
         assert position.instrument is not None
@@ -206,7 +206,7 @@ async def test_get_position_by_id_includes_computed_fields(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        position = PortfolioPosition(**data)
+        position = PortfolioPositionDocument(**data)
         # Verify computed fields are present
         assert position.unrealized_pnl is not None
         assert position.market_value is not None

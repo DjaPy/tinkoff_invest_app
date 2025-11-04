@@ -3,6 +3,7 @@ import asyncio
 from aiomisc import entrypoint
 
 from src.algo_trading.ports.api.v1 import analytics_router, orders_router, positions_router, strategies_router
+from src.algo_trading.services.scheduled_metrics import ScheduledMetricsService
 from src.base.fastapi_service import FastAPIService
 from src.base.mongo_service.service import MongoDBService
 from src.base.tinkoff_invest.service import TinkoffInvestServiceSandbox
@@ -16,6 +17,7 @@ tinkoff_invest_sandbox = TinkoffInvestServiceSandbox(
     context_name=TINKOFF_INVEST_SANDBOX,
 )
 mongo_service = MongoDBService(settings=config.mongo_db, context_name=MONGO_DB)
+scheduled_metrics_service = ScheduledMetricsService(run_at_startup=False)
 
 
 if __name__ == '__main__':
@@ -23,6 +25,7 @@ if __name__ == '__main__':
         fastapi_service,
         mongo_service,
         tinkoff_invest_sandbox,
+        scheduled_metrics_service,
         log_level='info',
         log_format='color',
         log_buffering=True,

@@ -1,7 +1,8 @@
+import logging
 import uuid
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Generator, Self, TypeVar
+from typing import Any, Callable, TypeVar
 
 import pytest
 import rstr
@@ -11,12 +12,19 @@ from faker import Faker
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
+from src.algo_trading.adapters.models import BEANIE_MODELS
 from src.config import config as build_config
-from src.sandbox.collections import all_collections
+
+pytest_plugins = [
+    'fixtures_db_data',
+]
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
 def fake():
+    """Faker."""
     return Faker('ru-RU')
 
 
@@ -29,7 +37,8 @@ def config():
 async def mongo_connection(config):
     name_database = f'{uuid.uuid4().hex}_pytest'
     _client = AsyncIOMotorClient(str(config.mongo_db.dsn))
-    await init_beanie(database=_client[name_database], document_models=all_collections)
+    await init_beanie(database=_client[name_database], document_models=BEANIE_MODELS)
+    logger.info(f'Connected to MongoDB, db={name_database}')
     yield _client
     await _client.drop_database(name_database)
     _client.close()
@@ -42,12 +51,6 @@ async def get_session(mongo_connection):
 
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
-
-
-@pytest.fixture
-def fake() -> Faker:
-    """Faker."""
-    return Faker('ru-RU')
 
 
 class ModelGenerator:
@@ -155,7 +158,6 @@ class ModelGenerator:
 def pydantic_generator_data(fake: Faker) -> ModelGenerator:
     """Генератор данных на основе пидантика."""
     return ModelGenerator(fake)
-
 
 
 @pytest.fixture

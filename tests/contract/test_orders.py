@@ -18,13 +18,13 @@ import pytest
 from pydantic import BaseModel, Field
 from starlette import status
 
-from src.algo_trading.adapters.models.order import OrderSide, OrderStatus, OrderType, TradeOrder
+from src.algo_trading.adapters.models.order import OrderSideEnum, OrderStatusEnum, OrderTypeEnum, TradeOrderDocument
 
 
 class OrderListResponse(BaseModel):
     """Response schema for GET /api/v1/orders."""
 
-    orders: list[TradeOrder] = Field(description='List of trade orders')
+    orders: list[TradeOrderDocument] = Field(description='List of trade orders')
     total: int = Field(ge=0, description='Total number of orders matching filters')
     limit: int = Field(ge=1, le=100, description='Request limit parameter')
     offset: int = Field(ge=0, description='Request offset parameter')
@@ -67,7 +67,12 @@ async def test_get_orders_validates_order_structure(client, config):
 
         response_model = OrderListResponse(**data)
 
-        # If orders exist, validate each order
+        valid_types = [
+            OrderTypeEnum.MARKET,
+            OrderTypeEnum.LIMIT,
+            OrderTypeEnum.STOP_LOSS,
+            OrderTypeEnum.TAKE_PROFIT,
+        ]
         if response_model.orders:
             for order in response_model.orders:
                 assert order.order_id is not None
@@ -75,17 +80,17 @@ async def test_get_orders_validates_order_structure(client, config):
                 assert order.session_id is not None
                 assert order.correlation_id is not None
                 assert order.instrument is not None
-                valid_types = [OrderType.MARKET, OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT]
+
                 assert order.order_type in valid_types
-                assert order.side in [OrderSide.BUY, OrderSide.SELL]
+                assert order.side in [OrderSideEnum.BUY, OrderSideEnum.SELL]
                 assert order.quantity > 0
                 assert order.status in [
-                    OrderStatus.PENDING,
-                    OrderStatus.SUBMITTED,
-                    OrderStatus.FILLED,
-                    OrderStatus.PARTIALLY_FILLED,
-                    OrderStatus.CANCELLED,
-                    OrderStatus.REJECTED,
+                    OrderStatusEnum.PENDING,
+                    OrderStatusEnum.SUBMITTED,
+                    OrderStatusEnum.FILLED,
+                    OrderStatusEnum.PARTIALLY_FILLED,
+                    OrderStatusEnum.CANCELLED,
+                    OrderStatusEnum.REJECTED,
                 ]
 
 
@@ -202,7 +207,7 @@ async def test_get_order_by_id_returns_order_details(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        order = TradeOrder(**data)
+        order = TradeOrderDocument(**data)
         assert order.order_id == order_id
         assert order.strategy_id is not None
         assert order.instrument is not None
@@ -255,9 +260,9 @@ async def test_cancel_order_cancels_pending_order(client, config):
         data = await response.json()
 
         # Validate response using Pydantic model
-        order = TradeOrder(**data)
+        order = TradeOrderDocument(**data)
         assert order.order_id == order_id
-        assert order.status == OrderStatus.CANCELLED
+        assert order.status == OrderStatusEnum.CANCELLED
 
 
 @pytest.mark.asyncio

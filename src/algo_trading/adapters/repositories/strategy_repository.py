@@ -5,7 +5,7 @@ Data access layer for TradingStrategy model.
 
 from uuid import UUID
 
-from src.algo_trading.adapters.models import StrategyStatus, TradingStrategy
+from src.algo_trading.adapters.models import StrategyStatusEnum, TradingStrategyDocument
 
 
 class StrategyRepository:
@@ -16,7 +16,7 @@ class StrategyRepository:
     """
 
     @staticmethod
-    async def create(strategy: TradingStrategy) -> TradingStrategy:
+    async def create(strategy: TradingStrategyDocument) -> TradingStrategyDocument:
         """
         Create a new trading strategy.
 
@@ -30,7 +30,7 @@ class StrategyRepository:
         return strategy
 
     @staticmethod
-    async def find_by_id(strategy_id: UUID) -> TradingStrategy | None:
+    async def find_by_id(strategy_id: UUID) -> TradingStrategyDocument | None:
         """
         Find strategy by UUID.
 
@@ -40,15 +40,33 @@ class StrategyRepository:
         Returns:
             TradingStrategy or None if not found
         """
-        return await TradingStrategy.find_one(TradingStrategy.strategy_id == strategy_id)
+        return await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
+
+    @staticmethod
+    async def find_by_ids(strategy_ids: list[UUID]) -> list[TradingStrategyDocument]:
+        """
+        Find multiple strategies by UUIDs.
+
+        Args:
+            strategy_ids: List of strategy UUIDs
+
+        Returns:
+            List of found strategies (may be fewer than requested if some not found)
+        """
+        if not strategy_ids:
+            return []
+
+        return await TradingStrategyDocument.find(
+            TradingStrategyDocument.strategy_id.in_(strategy_ids),  # type: ignore[attr-defined]
+        ).to_list()
 
     @staticmethod
     async def find_all(
         created_by: str | None = None,
-        status: StrategyStatus | None = None,
+        status: StrategyStatusEnum | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[TradingStrategy]:
+    ) -> list[TradingStrategyDocument]:
         """
         Find strategies with optional filtering.
 
@@ -69,10 +87,10 @@ class StrategyRepository:
         if status:
             query['status'] = status
 
-        return await TradingStrategy.find(query).skip(offset).limit(limit).to_list()
+        return await TradingStrategyDocument.find(query).skip(offset).limit(limit).to_list()
 
     @staticmethod
-    async def update(strategy: TradingStrategy) -> TradingStrategy:
+    async def update(strategy: TradingStrategyDocument) -> TradingStrategyDocument:
         """
         Update existing strategy.
 
@@ -107,7 +125,7 @@ class StrategyRepository:
         return True
 
     @staticmethod
-    async def count(created_by: str | None = None, status: StrategyStatus | None = None) -> int:
+    async def count(created_by: str | None = None, status: StrategyStatusEnum | None = None) -> int:
         """
         Count strategies matching filters.
 
@@ -126,10 +144,10 @@ class StrategyRepository:
         if status:
             query['status'] = status
 
-        return await TradingStrategy.find(query).count()
+        return await TradingStrategyDocument.find(query).count()
 
     @staticmethod
-    async def find_active_strategies(created_by: None | str = None) -> list[TradingStrategy]:
+    async def find_active_strategies(created_by: None | str = None) -> list[TradingStrategyDocument]:
         """
         Find all active strategies.
 
@@ -139,4 +157,4 @@ class StrategyRepository:
         Returns:
             List of active strategies
         """
-        return await StrategyRepository.find_all(created_by=created_by, status=StrategyStatus.ACTIVE)
+        return await StrategyRepository.find_all(created_by=created_by, status=StrategyStatusEnum.ACTIVE)

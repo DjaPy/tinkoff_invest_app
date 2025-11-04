@@ -2,42 +2,17 @@
 
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum
 from uuid import UUID, uuid4
 
 from beanie import Document
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
-
-class OrderType(str, Enum):
-    """Order type enumeration."""
-
-    MARKET = 'market'
-    LIMIT = 'limit'
-    STOP_LOSS = 'stop_loss'
-    TAKE_PROFIT = 'take_profit'
+from src.algo_trading.adapters.models.common import DecimalField
+from src.algo_trading.enums import OrderSideEnum, OrderStatusEnum, OrderTypeEnum
 
 
-class OrderSide(str, Enum):
-    """Order side enumeration."""
-
-    BUY = 'buy'
-    SELL = 'sell'
-
-
-class OrderStatus(str, Enum):
-    """Order execution status."""
-
-    PENDING = 'pending'
-    SUBMITTED = 'submitted'
-    FILLED = 'filled'
-    PARTIALLY_FILLED = 'partially_filled'
-    CANCELLED = 'cancelled'
-    REJECTED = 'rejected'
-
-
-class TradeOrder(Document):
+class TradeOrderDocument(Document):
     """
     Individual buy/sell order with execution details.
 
@@ -51,18 +26,18 @@ class TradeOrder(Document):
     correlation_id: UUID = Field(default_factory=uuid4, description='Audit trail correlation ID')
 
     instrument: str = Field(min_length=1, description='Trading instrument (ticker/FIGI)')
-    order_type: OrderType = Field(description='Order type')
-    side: OrderSide = Field(description='Buy or sell')
+    order_type: OrderTypeEnum = Field(description='Order type')
+    side: OrderSideEnum = Field(description='Buy or sell')
 
-    quantity: Decimal = Field(gt=0, description='Order quantity (shares/lots)')
-    price: Decimal = Field(default=Decimal('0'), gt=0, description='Limit price (None for market)')
-    status: OrderStatus = Field(default=OrderStatus.PENDING, description='Current order status')
+    quantity: DecimalField = Field(gt=0, description='Order quantity (shares/lots)')
+    price: DecimalField = Field(default=Decimal('0'), gt=0, description='Limit price (None for market)')
+    status: OrderStatusEnum = Field(default=OrderStatusEnum.PENDING, description='Current order status')
 
-    submitted_at: datetime = Field(default_factory=datetime.utcnow, description='Submission timestamp')
+    submitted_at: datetime = Field(default_factory=datetime.now, description='Submission timestamp')
     filled_at: datetime | None = Field(None, description='Execution timestamp')
-    filled_price: Decimal = Field(default=Decimal('0'), gt=0, description='Actual execution price')
-    filled_quantity: Decimal = Field(default=Decimal('0'), ge=0, description='Filled quantity')
-    commission: Decimal = Field(default=Decimal('0'), ge=0, description='Trading commission')
+    filled_price: DecimalField = Field(default=Decimal('0'), gt=0, description='Actual execution price')
+    filled_quantity: DecimalField = Field(default=Decimal('0'), ge=0, description='Filled quantity')
+    commission: DecimalField = Field(default=Decimal('0'), ge=0, description='Trading commission')
     external_order_id: str | None = Field(None, description="Broker's order ID")
 
     _immutable: bool = False
@@ -72,7 +47,7 @@ class TradeOrder(Document):
     def validate_limit_price(cls, v: Decimal | None, info: ValidationInfo) -> Decimal | None:
         """Limit orders must have a price."""
         order_type = info.data.get('order_type')
-        if order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT} and v is None:
+        if order_type in {OrderTypeEnum.LIMIT, OrderTypeEnum.STOP_LOSS, OrderTypeEnum.TAKE_PROFIT} and v is None:
             raise ValueError(f'{order_type} orders require a price')
         return v
 
@@ -85,7 +60,7 @@ class TradeOrder(Document):
             raise ValueError(f'Filled quantity {v} exceeds ordered quantity {quantity}')
         return v
 
-    def can_transition_to(self, new_status: OrderStatus) -> bool:
+    def can_transition_to(self, new_status: OrderStatusEnum) -> bool:
         """
         Check if status transition is valid.
 
@@ -95,21 +70,21 @@ class TradeOrder(Document):
         - PARTIALLY_FILLED → FILLED, CANCELLED
         """
         valid_transitions = {
-            OrderStatus.PENDING: {OrderStatus.SUBMITTED},
-            OrderStatus.SUBMITTED: {
-                OrderStatus.FILLED,
-                OrderStatus.PARTIALLY_FILLED,
-                OrderStatus.CANCELLED,
-                OrderStatus.REJECTED,
+            OrderStatusEnum.PENDING: {OrderStatusEnum.SUBMITTED},
+            OrderStatusEnum.SUBMITTED: {
+                OrderStatusEnum.FILLED,
+                OrderStatusEnum.PARTIALLY_FILLED,
+                OrderStatusEnum.CANCELLED,
+                OrderStatusEnum.REJECTED,
             },
-            OrderStatus.PARTIALLY_FILLED: {OrderStatus.FILLED, OrderStatus.CANCELLED},
+            OrderStatusEnum.PARTIALLY_FILLED: {OrderStatusEnum.FILLED, OrderStatusEnum.CANCELLED},
         }
 
         return new_status in valid_transitions.get(self.status, set())
 
     def update_status(
         self,
-        new_status: OrderStatus,
+        new_status: OrderStatusEnum,
         filled_price: Decimal | None = None,
         filled_quantity: Decimal | None = None,
         external_order_id: str | None = None,
@@ -139,7 +114,7 @@ class TradeOrder(Document):
             self.external_order_id = external_order_id
 
         # Mark as filled
-        if new_status in {OrderStatus.FILLED, OrderStatus.CANCELLED, OrderStatus.REJECTED}:
+        if new_status in {OrderStatusEnum.FILLED, OrderStatusEnum.CANCELLED, OrderStatusEnum.REJECTED}:
             self.filled_at = datetime.utcnow()
             self._immutable = True  # Immutable after final status
 

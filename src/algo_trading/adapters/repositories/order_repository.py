@@ -10,7 +10,7 @@ from typing import Any
 from uuid import UUID
 
 from src.algo_trading.adapters.dto_models.order_dto import OrderDTO
-from src.algo_trading.adapters.models.order import OrderStatus, TradeOrder
+from src.algo_trading.adapters.models.order import OrderStatusEnum, TradeOrderDocument
 
 
 class OrderRepository:
@@ -21,7 +21,7 @@ class OrderRepository:
     Maintains immutable audit trail for all order state changes.
     """
 
-    async def create_order(self, order: OrderDTO) -> TradeOrder:
+    async def create_order(self, order: OrderDTO) -> TradeOrderDocument:
         """
         Create a new trade order with audit trail.
 
@@ -35,7 +35,7 @@ class OrderRepository:
             All order state changes are immutable once persisted.
             :param order:
         """
-        order = TradeOrder(
+        order = TradeOrderDocument(
             strategy_id=order.strategy_id,
             session_id=order.session_id,
             instrument=order.instrument,
@@ -43,13 +43,13 @@ class OrderRepository:
             quantity=order.quantity,
             order_type=order.order_type,
             correlation_id=order.correlation_id,
-            status=OrderStatus.PENDING,
+            status=OrderStatusEnum.PENDING,
         )
 
         await order.insert()
         return order
 
-    async def find_by_id(self, order_id: UUID) -> TradeOrder | None:
+    async def find_by_id(self, order_id: UUID) -> TradeOrderDocument | None:
         """
         Find order by ID.
 
@@ -59,15 +59,15 @@ class OrderRepository:
         Returns:
             Order if found, None otherwise
         """
-        return await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        return await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
 
     async def find_by_strategy(
         self,
         strategy_id: UUID,
-        status: OrderStatus | None = None,
+        status: OrderStatusEnum | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[TradeOrder]:
+    ) -> list[TradeOrderDocument]:
         """
         Find orders for a strategy.
 
@@ -80,14 +80,14 @@ class OrderRepository:
         Returns:
             List of orders sorted by creation time (newest first)
         """
-        query = TradeOrder.find(TradeOrder.strategy_id == strategy_id)
+        query = TradeOrderDocument.find(TradeOrderDocument.strategy_id == strategy_id)
 
         if status:
-            query = query.find(TradeOrder.status == status)
+            query = query.find(TradeOrderDocument.status == status)
 
         return await query.sort('-created_at').skip(offset).limit(limit).to_list()
 
-    async def find_by_session(self, session_id: UUID, limit: int = 100, offset: int = 0) -> list[TradeOrder]:
+    async def find_by_session(self, session_id: UUID, limit: int = 100, offset: int = 0) -> list[TradeOrderDocument]:
         """
         Find orders for a trading session.
 
@@ -100,14 +100,14 @@ class OrderRepository:
             List of orders sorted by creation time
         """
         return (
-            await TradeOrder.find(TradeOrder.session_id == session_id)
+            await TradeOrderDocument.find(TradeOrderDocument.session_id == session_id)
             .sort('-created_at')
             .skip(offset)
             .limit(limit)
             .to_list()
         )
 
-    async def find_active_orders(self, strategy_id: UUID | None = None) -> list[TradeOrder]:
+    async def find_active_orders(self, strategy_id: UUID | None = None) -> list[TradeOrderDocument]:
         """
         Find all active (non-terminal) orders.
 
@@ -117,21 +117,21 @@ class OrderRepository:
         Returns:
             List of orders with PENDING or SUBMITTED status
         """
-        query = TradeOrder.find({'status': {'$in': [OrderStatus.PENDING, OrderStatus.SUBMITTED]}})
+        query = TradeOrderDocument.find({'status': {'$in': [OrderStatusEnum.PENDING, OrderStatusEnum.SUBMITTED]}})
 
         if strategy_id:
-            query = query.find(TradeOrder.strategy_id == strategy_id)
+            query = query.find(TradeOrderDocument.strategy_id == strategy_id)
 
         return await query.sort('created_at').to_list()
 
     async def update_status(
         self,
         order_id: UUID,
-        new_status: OrderStatus,
+        new_status: OrderStatusEnum,
         filled_quantity: int | None = None,
         filled_price: Decimal = Decimal('0'),
         rejection_reason: str | None = None,
-    ) -> TradeOrder:
+    ) -> TradeOrderDocument:
         """
         Update order status with audit trail.
 
@@ -161,14 +161,14 @@ class OrderRepository:
 
         # Validate status transition
         valid_transitions = {
-            OrderStatus.PENDING: {OrderStatus.SUBMITTED, OrderStatus.CANCELLED, OrderStatus.REJECTED},
-            OrderStatus.SUBMITTED: {
-                OrderStatus.FILLED,
-                OrderStatus.PARTIALLY_FILLED,
-                OrderStatus.CANCELLED,
-                OrderStatus.REJECTED,
+            OrderStatusEnum.PENDING: {OrderStatusEnum.SUBMITTED, OrderStatusEnum.CANCELLED, OrderStatusEnum.REJECTED},
+            OrderStatusEnum.SUBMITTED: {
+                OrderStatusEnum.FILLED,
+                OrderStatusEnum.PARTIALLY_FILLED,
+                OrderStatusEnum.CANCELLED,
+                OrderStatusEnum.REJECTED,
             },
-            OrderStatus.PARTIALLY_FILLED: {OrderStatus.FILLED, OrderStatus.CANCELLED},
+            OrderStatusEnum.PARTIALLY_FILLED: {OrderStatusEnum.FILLED, OrderStatusEnum.CANCELLED},
         }
 
         if new_status not in valid_transitions.get(order.status, set()):
@@ -181,17 +181,17 @@ class OrderRepository:
         # Update order
         order.status = new_status
 
-        if new_status in {OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED}:
+        if new_status in {OrderStatusEnum.FILLED, OrderStatusEnum.PARTIALLY_FILLED}:
             if filled_quantity is not None:
                 order.filled_quantity = Decimal(str(filled_quantity))
             if filled_price is not None:
                 order.filled_price = filled_price
             order.filled_at = datetime.utcnow()
 
-        if new_status == OrderStatus.REJECTED and rejection_reason:
+        if new_status == OrderStatusEnum.REJECTED and rejection_reason:
             order.rejection_reason = rejection_reason
 
-        if new_status == OrderStatus.CANCELLED:
+        if new_status == OrderStatusEnum.CANCELLED:
             order.cancelled_at = datetime.utcnow()
 
         order.updated_at = datetime.utcnow()
@@ -199,7 +199,7 @@ class OrderRepository:
         await order.save()
         return order
 
-    async def cancel_order(self, order_id: UUID) -> TradeOrder:
+    async def cancel_order(self, order_id: UUID) -> TradeOrderDocument:
         """
         Cancel an order.
 
@@ -212,7 +212,7 @@ class OrderRepository:
         Raises:
             ValueError: If order cannot be cancelled
         """
-        return await self.update_status(order_id, OrderStatus.CANCELLED)
+        return await self.update_status(order_id, OrderStatusEnum.CANCELLED)
 
     async def get_order_statistics(
         self,
@@ -247,24 +247,24 @@ class OrderRepository:
                 date_filter['$lte'] = period_end
             query_filter['created_at'] = date_filter
 
-        orders = await TradeOrder.find(query_filter).to_list()
+        orders = await TradeOrderDocument.find(query_filter).to_list()
 
-        filled_orders = [o for o in orders if o.status == OrderStatus.FILLED]
+        filled_orders = [o for o in orders if o.status == OrderStatusEnum.FILLED]
         total_volume = sum(o.filled_quantity for o in filled_orders if o.filled_quantity)
         filled_prices = [o.filled_price for o in filled_orders if o.filled_price is not None]
 
         return {
             'total_orders': len(orders),
             'filled_orders': len(filled_orders),
-            'cancelled_orders': sum(1 for o in orders if o.status == OrderStatus.CANCELLED),
-            'rejected_orders': sum(1 for o in orders if o.status == OrderStatus.REJECTED),
+            'cancelled_orders': sum(1 for o in orders if o.status == OrderStatusEnum.CANCELLED),
+            'rejected_orders': sum(1 for o in orders if o.status == OrderStatusEnum.REJECTED),
             'total_volume': total_volume,
             'average_fill_price': (
                 sum(filled_prices, Decimal('0')) / len(filled_prices) if filled_prices else Decimal('0')
             ),
         }
 
-    async def count(self, strategy_id: UUID | None = None, status: OrderStatus | None = None) -> int:
+    async def count(self, strategy_id: UUID | None = None, status: OrderStatusEnum | None = None) -> int:
         """
         Count orders with optional filters.
 
@@ -282,4 +282,4 @@ class OrderRepository:
         if status:
             query_filter['status'] = status
 
-        return await TradeOrder.find(query_filter).count()
+        return await TradeOrderDocument.find(query_filter).count()

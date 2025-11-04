@@ -9,12 +9,12 @@ from uuid import UUID
 
 from src.algo_trading.adapters.dto_models.order_dto import OrderDTO
 from src.algo_trading.adapters.models import (
-    OrderSide,
-    OrderStatus,
-    OrderType,
-    PortfolioPosition,
-    TradeOrder,
-    TradingSession,
+    OrderSideEnum,
+    OrderStatusEnum,
+    OrderTypeEnum,
+    PortfolioPositionDocument,
+    TradeOrderDocument,
+    TradingSessionDocument,
 )
 from src.algo_trading.domain.risk.risk_evaluator import OrderProposal, PositionRisk, RiskEvaluator, RiskLimits
 
@@ -44,7 +44,7 @@ class OrderExecutor:
         order: OrderDTO,
         risk_limits: RiskLimits | None = None,
         current_risk: PositionRisk | None = None,
-    ) -> TradeOrder:
+    ) -> TradeOrderDocument:
         """
         Place a new order with risk validation.
 
@@ -64,7 +64,7 @@ class OrderExecutor:
 
         # Validate price for limit orders
         if (
-            order.order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT}
+            order.order_type in {OrderTypeEnum.LIMIT, OrderTypeEnum.STOP_LOSS, OrderTypeEnum.TAKE_PROFIT}
             and order.limit_price is None
         ):
             raise OrderExecutorError(f'{order.order_type} orders require a price')
@@ -90,7 +90,7 @@ class OrderExecutor:
                 raise OrderExecutorError(f'Order rejected by risk controls: {risk_result.reason}')
 
         # Create order
-        order = TradeOrder(
+        order = TradeOrderDocument(
             strategy_id=order.strategy_id,
             session_id=order.session_id,
             instrument=order.instrument,
@@ -103,14 +103,14 @@ class OrderExecutor:
         await order.insert()
 
         # Record order in session
-        session = await TradingSession.get(order.session_id)
+        session = await TradingSessionDocument.get(order.session_id)
         if session:
             session.record_order('pending')
             await session.save()
 
         return order
 
-    async def submit_order(self, order_id: UUID, external_order_id: str) -> TradeOrder:
+    async def submit_order(self, order_id: UUID, external_order_id: str) -> TradeOrderDocument:
         """
         Mark order as submitted to broker.
 
@@ -124,12 +124,12 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If order not found or invalid transition
         """
-        order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
         if not order:
             raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
-            order.update_status(OrderStatus.SUBMITTED, external_order_id=external_order_id)
+            order.update_status(OrderStatusEnum.SUBMITTED, external_order_id=external_order_id)
             await order.save()
         except ValueError as e:
             raise OrderExecutorError(f'Failed to submit order: {e}') from e
@@ -142,7 +142,7 @@ class OrderExecutor:
         filled_price: Decimal,
         filled_quantity: Decimal,
         commission: Decimal = Decimal('0'),
-    ) -> tuple[TradeOrder, PortfolioPosition | None]:
+    ) -> tuple[TradeOrderDocument, PortfolioPositionDocument | None]:
         """
         Mark order as filled and update portfolio position.
 
@@ -158,13 +158,13 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If operation fails
         """
-        order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
         if not order:
             raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
             # Determine final status
-            status = OrderStatus.FILLED if filled_quantity == order.quantity else OrderStatus.PARTIALLY_FILLED
+            status = OrderStatusEnum.FILLED if filled_quantity == order.quantity else OrderStatusEnum.PARTIALLY_FILLED
 
             order.update_status(status, filled_price=filled_price, filled_quantity=filled_quantity)
             order.commission = commission
@@ -174,7 +174,7 @@ class OrderExecutor:
             position = await self._update_position(order, filled_price, filled_quantity)
 
             # Update session
-            session = await TradingSession.get(order.session_id)
+            session = await TradingSessionDocument.get(order.session_id)
             if session:
                 session.record_order('filled')
                 session.add_commission(commission)
@@ -185,7 +185,7 @@ class OrderExecutor:
         except ValueError as e:
             raise OrderExecutorError(f'Failed to fill order: {e}') from e
 
-    async def cancel_order(self, order_id: UUID) -> TradeOrder:
+    async def cancel_order(self, order_id: UUID) -> TradeOrderDocument:
         """
         Cancel order before execution.
 
@@ -198,16 +198,16 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If cannot cancel
         """
-        order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
         if not order:
             raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
-            order.update_status(OrderStatus.CANCELLED)
+            order.update_status(OrderStatusEnum.CANCELLED)
             await order.save()
 
             # Update session
-            session = await TradingSession.get(order.session_id)
+            session = await TradingSessionDocument.get(order.session_id)
             if session:
                 session.record_order('cancelled')
                 await session.save()
@@ -217,7 +217,7 @@ class OrderExecutor:
 
         return order
 
-    async def reject_order(self, order_id: UUID, reason: str) -> TradeOrder:
+    async def reject_order(self, order_id: UUID, reason: str) -> TradeOrderDocument:
         """
         Mark order as rejected by broker.
 
@@ -231,16 +231,16 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If operation fails
         """
-        order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
         if not order:
             raise OrderExecutorError(f'Order {order_id} not found')
 
         try:
-            order.update_status(OrderStatus.REJECTED)
+            order.update_status(OrderStatusEnum.REJECTED)
             await order.save()
 
             # Update session
-            session = await TradingSession.get(order.session_id)
+            session = await TradingSessionDocument.get(order.session_id)
             if session:
                 session.record_order('rejected')
                 await session.save()
@@ -250,7 +250,7 @@ class OrderExecutor:
 
         return order
 
-    async def get_order(self, order_id: UUID) -> TradeOrder:
+    async def get_order(self, order_id: UUID) -> TradeOrderDocument:
         """
         Get order by ID.
 
@@ -263,7 +263,7 @@ class OrderExecutor:
         Raises:
             OrderExecutorError: If not found
         """
-        order = await TradeOrder.find_one(TradeOrder.order_id == order_id)
+        order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
         if not order:
             raise OrderExecutorError(f'Order {order_id} not found')
 
@@ -273,10 +273,10 @@ class OrderExecutor:
         self,
         strategy_id: UUID | None = None,
         session_id: UUID | None = None,
-        status: OrderStatus | None = None,
+        status: OrderStatusEnum | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[TradeOrder]:
+    ) -> list[TradeOrderDocument]:
         """
         List orders with filtering.
 
@@ -301,14 +301,14 @@ class OrderExecutor:
         if status:
             query['status'] = status
 
-        return await TradeOrder.find(query).skip(offset).limit(limit).to_list()
+        return await TradeOrderDocument.find(query).skip(offset).limit(limit).to_list()
 
     async def _update_position(
         self,
-        order: TradeOrder,
+        order: TradeOrderDocument,
         filled_price: Decimal,
         filled_quantity: Decimal,
-    ) -> PortfolioPosition | None:
+    ) -> PortfolioPositionDocument | None:
         """
         Update portfolio position after order fill.
 
@@ -321,13 +321,13 @@ class OrderExecutor:
             Updated position or None
         """
         # Find existing position
-        position = await PortfolioPosition.find_one(
-            PortfolioPosition.strategy_id == order.strategy_id,
-            PortfolioPosition.instrument == order.instrument,
+        position = await PortfolioPositionDocument.find_one(
+            PortfolioPositionDocument.strategy_id == order.strategy_id,
+            PortfolioPositionDocument.instrument == order.instrument,
         )
 
         # Calculate position delta
-        quantity_delta = filled_quantity if order.side == OrderSide.BUY else -filled_quantity
+        quantity_delta = filled_quantity if order.side == OrderSideEnum.BUY else -filled_quantity
 
         if position:
             # Update existing position
@@ -335,7 +335,7 @@ class OrderExecutor:
             await position.save()
         else:
             # Create new position
-            position = PortfolioPosition(
+            position = PortfolioPositionDocument(
                 strategy_id=order.strategy_id,
                 instrument=order.instrument,
                 quantity=quantity_delta,
@@ -367,7 +367,7 @@ class OrderExecutor:
         self,
         instrument: str,
         quantity: Decimal,
-        order_type: OrderType,
+        order_type: OrderTypeEnum,
         price: Decimal | None,
     ) -> None:
         """
@@ -392,11 +392,11 @@ class OrderExecutor:
             raise OrderExecutorError(f'Quantity must be at least 1, got {quantity}')
 
         if (
-            order_type in {OrderType.LIMIT, OrderType.STOP_LOSS, OrderType.TAKE_PROFIT}
+            order_type in {OrderTypeEnum.LIMIT, OrderTypeEnum.STOP_LOSS, OrderTypeEnum.TAKE_PROFIT}
             and price is not None
             and price <= 0
         ):
             raise OrderExecutorError(f'Price must be positive, got {price}')
 
-        if order_type == OrderType.MARKET and price is not None:
+        if order_type == OrderTypeEnum.MARKET and price is not None:
             raise OrderExecutorError('Market orders cannot specify a price')

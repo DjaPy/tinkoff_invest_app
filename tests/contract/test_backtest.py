@@ -11,14 +11,16 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from pydantic import BaseModel, Field
 from starlette import status
+
+from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
+    BacktestResults,
+)
 
 
 @pytest.mark.asyncio
 async def test_post_backtest_runs_strategy_backtest(client, config):
     """Test POST /api/v1/analytics/backtest runs a backtest"""
-    datetime
     backtest_request = {
         'strategy_type': 'momentum',
         'parameters': {'lookback_period': 20, 'momentum_threshold': 0.02, 'position_size': 100},
@@ -38,9 +40,6 @@ async def test_post_backtest_runs_strategy_backtest(client, config):
             'enabled': True,
         },
     }
-
-    # Validate request structure
-    BacktestRequest(**backtest_request)
 
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/backtest',

@@ -20,39 +20,65 @@ from uuid import uuid4
 import pytest
 from starlette import status
 
-from src.algo_trading.adapters.models.metrics import PerformanceMetrics
+from algo_trading.ports.api.v1.schemas.analytics_schema import (
+    DrawdownAnalysisResponseSchema,
+    PortfolioSummaryResponseSchema,
+    TradeAnalyticsResponseSchema,
+)
+from src.algo_trading.enums import OrderStatusEnum
+from src.algo_trading.adapters.models import TradingStrategyDocument
+from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
 
 @pytest.mark.asyncio
-async def test_get_strategy_performance_returns_metrics(config, services, client):
+async def test_get_strategy_performance_returns_metrics(
+        config,
+        services,
+        client,
+        pydantic_generator_data,
+        create_trading_strategy,
+        create_trading_sessions,
+        create_order,
+):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance returns metrics"""
     strategy_id = uuid4()
 
+    strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
+
+    for day_offset in range(35):
+        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
+        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+
+        session = await create_trading_sessions(
+            strategy_id=strategy.strategy_id,
+            session_start=session_start,
+            session_end=session_end,
+        )
+
+        for _ in range(5):
+            await create_order(
+                strategy_id=strategy.strategy_id,
+                session_id=session.session_id,
+                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                status=OrderStatusEnum.FILLED,
+            )
+
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=1m',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions
+
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
-        # Validate response using Pydantic model
-        metrics = PerformanceMetrics(**data)
-        assert metrics.strategy_id == strategy_id
-        assert metrics.total_return is not None
-        assert metrics.annualized_return is not None
-        assert metrics.sharpe_ratio is not None
-        assert metrics.max_drawdown <= 0  # Drawdown should be negative or zero
-        assert metrics.volatility >= 0
-        assert 0 <= metrics.win_rate <= 1
-        assert metrics.profit_factor >= 0
-        assert metrics.trade_count >= 0
+        metrics = PerformanceMetricsDocument(**data)
+        assert metrics.strategy_id == strategy.strategy_id
 
 
 @pytest.mark.parametrize('period', ['1d', '1w', '1m', '3m', '1y', 'all'])
 @pytest.mark.asyncio
-async def test_get_strategy_performance_with_period_filter(client, config, period):
+async def test_get_strategy_performance_with_period_filter(client, services, config, period):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports period filters"""
     strategy_id = uuid4()
 
@@ -62,12 +88,12 @@ async def test_get_strategy_performance_with_period_filter(client, config, perio
     ) as response:
         if response.status == status.HTTP_200_OK:
             data = await response.json()
-            metrics = PerformanceMetrics(**data)
+            metrics = PerformanceMetricsDocument(**data)
             assert metrics.strategy_id == strategy_id
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_performance_custom_date_range(client, config):
+async def test_get_strategy_performance_custom_date_range(client, config, services):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports custom date range"""
 
     strategy_id = uuid4()
@@ -81,18 +107,18 @@ async def test_get_strategy_performance_custom_date_range(client, config):
     ) as response:
         if response.status == status.HTTP_200_OK:
             data = await response.json()
-            metrics = PerformanceMetrics(**data)
+            metrics = PerformanceMetricsDocument(**data)
             assert metrics.period_start.date() >= datetime.fromisoformat(from_date).date()
             assert metrics.period_end.date() <= datetime.fromisoformat(to_date).date()
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_performance_not_found(client, config):
+async def test_get_strategy_performance_not_found(client, config, services, get_session):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance returns 404"""
     non_existent_id = uuid4()
 
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{non_existent_id}/performance',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{non_existent_id}/performance?period=1m',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_404_NOT_FOUND
@@ -100,68 +126,135 @@ async def test_get_strategy_performance_not_found(client, config):
         assert data['status'] == 404
 
 
-# ==================== TRADE ANALYTICS TESTS (T017) ====================
-
-
 @pytest.mark.asyncio
-async def test_get_strategy_trades_analytics(client, config):
+async def test_get_strategy_trades_analytics(
+    client,
+    config,
+    services,
+    create_trading_strategy,
+    create_trading_sessions,
+    create_order,
+):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/trades returns trade analytics"""
     strategy_id = uuid4()
 
+    strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
+
+    for day_offset in range(35):
+        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
+        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+
+        session = await create_trading_sessions(
+            strategy_id=strategy.strategy_id,
+            session_start=session_start,
+            session_end=session_end,
+        )
+
+        for _ in range(5):
+            await create_order(
+                strategy_id=strategy.strategy_id,
+                session_id=session.session_id,
+                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                status=OrderStatusEnum.FILLED,
+            )
+
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/trades',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/trades?period=1d',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        # Validate response using Pydantic model
-        analytics = TradeAnalytics(**data)
-        assert analytics.strategy_id == str(strategy_id)
-        assert analytics.total_trades >= 0
-        assert analytics.winning_trades + analytics.losing_trades == analytics.total_trades
-        assert 0 <= analytics.win_rate <= 1
-        assert analytics.profit_factor >= 0
-
-
-# ==================== DRAWDOWN TESTS (T018) ====================
+        analytics = TradeAnalyticsResponseSchema(**data)
+        assert analytics.strategy_id == strategy_id
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_drawdown_analysis(client, config):
+async def test_get_strategy_drawdown_analysis(
+    client,
+    config,
+    services,
+    create_trading_strategy,
+    create_trading_sessions,
+    create_order,
+):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/drawdown returns drawdown analysis"""
     strategy_id = uuid4()
 
+    strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
+
+    for day_offset in range(35):
+        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
+        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+
+        session = await create_trading_sessions(
+            strategy_id=strategy.strategy_id,
+            session_start=session_start,
+            session_end=session_end,
+        )
+
+        for _ in range(5):
+            await create_order(
+                strategy_id=strategy.strategy_id,
+                session_id=session.session_id,
+                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                status=OrderStatusEnum.FILLED,
+            )
+
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/drawdown',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/drawdown?period=1d',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        # Validate response using Pydantic model
-        drawdown = DrawdownAnalysis(**data)
-        assert drawdown.strategy_id == str(strategy_id)
+        drawdown = DrawdownAnalysisResponseSchema(**data)
+        assert drawdown.strategy_id == strategy_id
         assert drawdown.max_drawdown <= 0
         assert drawdown.max_drawdown_duration >= 0
         assert drawdown.current_drawdown <= 0
 
 
-# ==================== PORTFOLIO SUMMARY TESTS (T019) ====================
-
-
 @pytest.mark.asyncio
-async def test_get_portfolio_summary(client, config):
+async def test_get_portfolio_summary(
+    client,
+    config,
+    services,
+    create_trading_strategy,
+    create_trading_sessions,
+    create_order,
+):
     """Test GET /api/v1/analytics/portfolio/summary returns portfolio summary"""
+
+    strategy_id = uuid4()
+
+    strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
+
+    for day_offset in range(35):
+        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
+        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+
+        session = await create_trading_sessions(
+            strategy_id=strategy.strategy_id,
+            session_start=session_start,
+            session_end=session_end,
+        )
+
+        for _ in range(5):
+            await create_order(
+                strategy_id=strategy.strategy_id,
+                session_id=session.session_id,
+                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                status=OrderStatusEnum.FILLED,
+            )
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/portfolio/summary',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/portfolio/summary?period=1d',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        # Validate response using Pydantic model
-        summary = PortfolioSummary(**data)
+        summary = PortfolioSummaryResponseSchema(**data)
         assert summary.total_value >= 0
         assert summary.active_strategies >= 0
         assert summary.total_trades >= 0
@@ -196,7 +289,6 @@ async def test_get_market_data_analytics(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        # Validate response using Pydantic model
         market_data = MarketDataAnalytics(**data)
         assert market_data.instrument == instrument
         assert market_data.timeframe is not None

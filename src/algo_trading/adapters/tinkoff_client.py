@@ -13,7 +13,7 @@ from tinkoff.invest import Quotation
 from tinkoff.invest.async_services import AsyncServices
 from tinkoff.invest.schemas import MoneyValue
 
-from src.algo_trading.adapters.models import OrderSide, OrderType
+from src.algo_trading.adapters.models import OrderSideEnum, OrderTypeEnum
 
 
 class TinkoffClientError(Exception):
@@ -171,8 +171,8 @@ class TinkoffInvestClient:
         self,
         figi: str,
         quantity: int,
-        order_type: OrderType,
-        side: OrderSide,
+        order_type: OrderTypeEnum,
+        side: OrderSideEnum,
         price: Decimal = Decimal('0'),
     ) -> dict[str, Any]:
         """
@@ -200,16 +200,16 @@ class TinkoffInvestClient:
             # Map our order types to Tinkoff types
             tinkoff_order_type = (
                 TinkoffOrderType.ORDER_TYPE_MARKET
-                if order_type == OrderType.MARKET
+                if order_type == OrderTypeEnum.MARKET
                 else TinkoffOrderType.ORDER_TYPE_LIMIT
             )
 
             direction = (
-                OrderDirection.ORDER_DIRECTION_BUY if side == OrderSide.BUY else OrderDirection.ORDER_DIRECTION_SELL
+                OrderDirection.ORDER_DIRECTION_BUY if side == OrderSideEnum.BUY else OrderDirection.ORDER_DIRECTION_SELL
             )
 
             # Place order
-            if order_type == OrderType.MARKET:
+            if order_type == OrderTypeEnum.MARKET:
                 response = await client.orders.post_order(
                     figi=figi,
                     quantity=quantity,

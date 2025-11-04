@@ -7,8 +7,10 @@ from uuid import UUID, uuid4
 from beanie import Document
 from pydantic import Field, ValidationInfo, field_validator
 
+from src.algo_trading.adapters.models.common import DecimalField
 
-class TradingSession(Document):
+
+class TradingSessionDocument(Document):
     """
     Time-bounded strategy execution period.
 
@@ -29,13 +31,13 @@ class TradingSession(Document):
     orders_rejected: int = Field(default=0, ge=0, description='Orders rejected')
 
     # Financial metrics
-    total_commission: Decimal = Field(default=Decimal('0'), ge=0, description='Total commissions paid')
-    realized_pnl: Decimal = Field(default=Decimal('0'), description='Realized profit/loss')
-    starting_capital: Decimal = Field(gt=0, description='Starting capital for session')
-    ending_capital: Decimal | None = Field(None, description='Ending capital (None if active)')
+    total_commission: DecimalField = Field(default=Decimal('0'), ge=0, description='Total commissions paid')
+    realized_pnl: DecimalField = Field(default=Decimal('0'), description='Realized profit/loss')
+    starting_capital: DecimalField = Field(gt=0, description='Starting capital for session')
+    ending_capital: DecimalField | None = Field(None, description='Ending capital (None if active)')
 
     # Risk tracking
-    max_drawdown_reached: Decimal = Field(default=Decimal('0'), description='Maximum drawdown during session')
+    max_drawdown_reached: DecimalField = Field(default=Decimal('0'), description='Maximum drawdown during session')
     risk_violations: int = Field(default=0, ge=0, description='Number of risk violations')
 
     @field_validator('session_end', mode='after')

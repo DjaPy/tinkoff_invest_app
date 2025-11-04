@@ -10,7 +10,7 @@ from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
 
-class MarketData(Document):
+class MarketDataDocument(Document):
     """
     Real-time and historical market data.
 

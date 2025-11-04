@@ -11,13 +11,13 @@ import pytest
 from pydantic import BaseModel, Field, ValidationError
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import StrategyStatus, StrategyType, TradingStrategy
+from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, StrategyTypeEnum, TradingStrategyDocument
 
 
 class StrategyListResponse(BaseModel):
     """Response schema for GET /api/v1/strategies."""
 
-    strategies: list[TradingStrategy] = Field(description='List of trading strategies')
+    strategies: list[TradingStrategyDocument] = Field(description='List of trading strategies')
     total: int = Field(ge=0, description='Total number of strategies')
 
 
@@ -61,17 +61,17 @@ async def test_get_strategies_validates_strategy_structure(client, config, pydan
                 assert strategy.strategy_id is not None
                 assert strategy.name is not None
                 assert strategy.strategy_type in [
-                    StrategyType.MOMENTUM,
-                    StrategyType.MEAN_REVERSION,
-                    StrategyType.ARBITRAGE,
-                    StrategyType.MARKET_MAKING,
+                    StrategyTypeEnum.MOMENTUM,
+                    StrategyTypeEnum.MEAN_REVERSION,
+                    StrategyTypeEnum.ARBITRAGE,
+                    StrategyTypeEnum.MARKET_MAKING,
                 ]
                 assert strategy.status in [
-                    StrategyStatus.INACTIVE,
-                    StrategyStatus.ACTIVE,
-                    StrategyStatus.PAUSED,
-                    StrategyStatus.STOPPED,
-                    StrategyStatus.ERROR,
+                    StrategyStatusEnum.INACTIVE,
+                    StrategyStatusEnum.ACTIVE,
+                    StrategyStatusEnum.PAUSED,
+                    StrategyStatusEnum.STOPPED,
+                    StrategyStatusEnum.ERROR,
                 ]
                 assert strategy.parameters is not None
                 assert isinstance(strategy.parameters, dict)

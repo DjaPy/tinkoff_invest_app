@@ -8,7 +8,7 @@ from decimal import Decimal
 
 from tinkoff.invest import CandleInterval
 
-from src.algo_trading.adapters.models.market_data import MarketData
+from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
 
 
@@ -68,7 +68,12 @@ class MarketDataService:
         except Exception as e:
             raise MarketDataError(f'Failed to get current price for FIGI {figi}: {e}') from e
 
-    async def get_historical_data(self, ticker: str, timeframe: str = '1d', limit: int = 100) -> list[MarketData]:
+    async def get_historical_data(
+        self,
+        ticker: str,
+        timeframe: str = '1d',
+        limit: int = 100,
+    ) -> list[MarketDataDocument]:
         """
         Get historical market data.
 
@@ -121,7 +126,7 @@ class MarketDataService:
             # Convert to MarketData models and save to database
             market_data_list = []
             for candle in candles:
-                market_data = MarketData(
+                market_data = MarketDataDocument(
                     instrument=ticker,
                     timeframe=timeframe,
                     timestamp=candle['time'],
@@ -138,7 +143,7 @@ class MarketDataService:
         except Exception as e:
             raise MarketDataError(f'Failed to get historical data for {ticker}: {e}') from e
 
-    async def get_cached_data(self, ticker: str, timeframe: str = '1d', limit: int = 100) -> list[MarketData]:
+    async def get_cached_data(self, ticker: str, timeframe: str = '1d', limit: int = 100) -> list[MarketDataDocument]:
         """
         Get cached market data from database.
 
@@ -156,7 +161,9 @@ class MarketDataService:
         try:
             # Query from database
             return (
-                await MarketData.find(MarketData.instrument == ticker, MarketData.timeframe == timeframe)
+                await MarketDataDocument.find(
+                    MarketDataDocument.instrument == ticker, MarketDataDocument.timeframe == timeframe,
+                )
                 .sort('-timestamp')
                 .limit(limit)
                 .to_list()
@@ -171,7 +178,7 @@ class MarketDataService:
         timeframe: str = '1d',
         limit: int = 100,
         max_age_minutes: int = 60,
-    ) -> list[MarketData]:
+    ) -> list[MarketDataDocument]:
         """
         Get market data from cache or fetch if stale.
 

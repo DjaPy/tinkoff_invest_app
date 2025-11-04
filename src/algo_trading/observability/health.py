@@ -6,7 +6,7 @@ Provides health and readiness checks for the application.
 from datetime import datetime
 from typing import Any
 
-from src.algo_trading.adapters.models import TradingStrategy
+from src.algo_trading.adapters.models import TradingStrategyDocument
 
 
 class HealthChecker:
@@ -70,7 +70,7 @@ class HealthChecker:
         """
         try:
             # Simple ping by counting documents
-            await TradingStrategy.count()
+            await TradingStrategyDocument.count()
             return True
         except Exception:
             return False
@@ -84,7 +84,7 @@ class HealthChecker:
         """
         try:
             # Try to query strategies
-            await TradingStrategy.find().limit(1).to_list()
+            await TradingStrategyDocument.find().limit(1).to_list()
             return True
         except Exception:
             return False
@@ -98,9 +98,9 @@ class HealthChecker:
         """
         # Count strategies by status
         try:
-            total_strategies = await TradingStrategy.count()
-            active_strategies = await TradingStrategy.find(
-                TradingStrategy.status == 'ACTIVE',
+            total_strategies = await TradingStrategyDocument.count()
+            active_strategies = await TradingStrategyDocument.find(
+                TradingStrategyDocument.status == 'ACTIVE',
             ).count()
         except Exception:
             total_strategies = 0

@@ -14,7 +14,7 @@ import pytest
 from pydantic import BaseModel, Field
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import RiskControls, TradingStrategy
+from src.algo_trading.adapters.models.strategy import RiskControls, TradingStrategyDocument
 
 
 class UpdateStrategyRequest(BaseModel):
@@ -66,7 +66,7 @@ async def test_put_strategy_updates_existing_strategy(client, config, pydantic_g
         data = await response.json()
 
         # Validate response using Pydantic model
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         assert strategy.strategy_id == strategy_id
         assert strategy.name == update_data['name']
         assert strategy.parameters == update_data['parameters']
@@ -89,7 +89,7 @@ async def test_put_strategy_partial_update(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         assert strategy.name == update_data['name']
         # Other fields should remain unchanged
 
@@ -203,7 +203,7 @@ async def test_put_strategy_updates_timestamp(client, config):
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        strategy = TradingStrategy(**data)
+        strategy = TradingStrategyDocument(**data)
         # updated_at should be present and more recent than created_at
         assert strategy.updated_at is not None
         assert strategy.created_at is not None

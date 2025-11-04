@@ -9,7 +9,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models.position import PortfolioPosition
+from src.algo_trading.adapters.models.position import PortfolioPositionDocument
 
 
 class PositionRepository:
@@ -27,7 +27,7 @@ class PositionRepository:
         quantity: int,
         average_price: Decimal,
         current_price: Decimal,
-    ) -> PortfolioPosition:
+    ) -> PortfolioPositionDocument:
         """
         Create new position or update existing one.
 
@@ -56,7 +56,7 @@ class PositionRepository:
             await existing.save()
             return existing
         # Create new position
-        position = PortfolioPosition(
+        position = PortfolioPositionDocument(
             strategy_id=strategy_id,
             instrument=instrument,
             quantity=Decimal(str(quantity)),
@@ -66,7 +66,7 @@ class PositionRepository:
         await position.insert()
         return position
 
-    async def find_by_id(self, position_id: UUID) -> PortfolioPosition | None:
+    async def find_by_id(self, position_id: UUID) -> PortfolioPositionDocument | None:
         """
         Find position by ID.
 
@@ -76,9 +76,13 @@ class PositionRepository:
         Returns:
             Position if found, None otherwise
         """
-        return await PortfolioPosition.find_one(PortfolioPosition.position_id == position_id)
+        return await PortfolioPositionDocument.find_one(PortfolioPositionDocument.position_id == position_id)
 
-    async def find_by_strategy(self, strategy_id: UUID, include_closed: bool = False) -> list[PortfolioPosition]:
+    async def find_by_strategy(
+        self,
+        strategy_id: UUID,
+        include_closed: bool,
+    ) -> list[PortfolioPositionDocument]:
         """
         Find all positions for a strategy.
 
@@ -89,14 +93,18 @@ class PositionRepository:
         Returns:
             List of positions sorted by instrument
         """
-        query = PortfolioPosition.find(PortfolioPosition.strategy_id == strategy_id)
+        query = PortfolioPositionDocument.find(PortfolioPositionDocument.strategy_id == strategy_id)
 
         if not include_closed:
-            query = query.find(PortfolioPosition.quantity != 0)
+            query = query.find(PortfolioPositionDocument.quantity != 0)
 
         return await query.sort('instrument').to_list()
 
-    async def find_by_strategy_and_instrument(self, strategy_id: UUID, instrument: str) -> PortfolioPosition | None:
+    async def find_by_strategy_and_instrument(
+        self,
+        strategy_id: UUID,
+        instrument: str,
+    ) -> PortfolioPositionDocument | None:
         """
         Find position for specific strategy and instrument.
 
@@ -107,12 +115,12 @@ class PositionRepository:
         Returns:
             Position if found, None otherwise
         """
-        return await PortfolioPosition.find_one(
-            PortfolioPosition.strategy_id == strategy_id,
-            PortfolioPosition.instrument == instrument,
+        return await PortfolioPositionDocument.find_one(
+            PortfolioPositionDocument.strategy_id == strategy_id,
+            PortfolioPositionDocument.instrument == instrument,
         )
 
-    async def update_market_price(self, position_id: UUID, new_price: Decimal) -> PortfolioPosition:
+    async def update_market_price(self, position_id: UUID, new_price: Decimal) -> PortfolioPositionDocument:
         """
         Update current market price for real-time P&L tracking.
 
@@ -136,7 +144,7 @@ class PositionRepository:
         await position.save()
         return position
 
-    async def update_market_prices_bulk(self, price_updates: dict[str, Decimal]) -> list[PortfolioPosition]:
+    async def update_market_prices_bulk(self, price_updates: dict[str, Decimal]) -> list[PortfolioPositionDocument]:
         """
         Bulk update market prices for multiple instruments.
 
@@ -153,9 +161,9 @@ class PositionRepository:
 
         for instrument, new_price in price_updates.items():
             # Find all positions for this instrument
-            positions = await PortfolioPosition.find(
-                PortfolioPosition.instrument == instrument,
-                PortfolioPosition.quantity != 0,
+            positions = await PortfolioPositionDocument.find(
+                PortfolioPositionDocument.instrument == instrument,
+                PortfolioPositionDocument.quantity != 0,
             ).to_list()
 
             for position in positions:
@@ -166,7 +174,12 @@ class PositionRepository:
 
         return updated_positions
 
-    async def adjust_position(self, position_id: UUID, quantity_delta: int, trade_price: Decimal) -> PortfolioPosition:
+    async def adjust_position(
+        self,
+        position_id: UUID,
+        quantity_delta: int,
+        trade_price: Decimal,
+    ) -> PortfolioPositionDocument:
         """
         Adjust position quantity and recalculate average price.
 
@@ -213,7 +226,7 @@ class PositionRepository:
         await position.save()
         return position
 
-    async def close_position(self, position_id: UUID, exit_price: Decimal) -> PortfolioPosition:
+    async def close_position(self, position_id: UUID, exit_price: Decimal) -> PortfolioPositionDocument:
         """
         Close position and realize final P&L.
 
@@ -316,4 +329,4 @@ class PositionRepository:
         if not include_closed:
             query_filter['quantity'] = {'$ne': 0}
 
-        return await PortfolioPosition.find(query_filter).count()
+        return await PortfolioPositionDocument.find(query_filter).count()

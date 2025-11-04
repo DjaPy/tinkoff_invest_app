@@ -8,7 +8,7 @@ from http import HTTPStatus
 
 import pytest
 
-from src.algo_trading.adapters.models import StrategyStatus, StrategyType
+from src.algo_trading.adapters.models import StrategyStatusEnum, StrategyTypeEnum
 
 
 @pytest.mark.asyncio
@@ -57,8 +57,8 @@ async def test_create_and_deploy_trading_strategy(client, config, mongo_connecti
         # Verify strategy creation
         assert 'strategy_id' in created_strategy
         assert created_strategy['name'] == 'Simple Momentum Strategy'
-        assert created_strategy['strategy_type'] == StrategyType.MOMENTUM.value
-        assert created_strategy['status'] == StrategyStatus.INACTIVE.value
+        assert created_strategy['strategy_type'] == StrategyTypeEnum.MOMENTUM.value
+        assert created_strategy['status'] == StrategyStatusEnum.INACTIVE.value
 
         strategy_id = created_strategy['strategy_id']
 
@@ -76,7 +76,7 @@ async def test_create_and_deploy_trading_strategy(client, config, mongo_connecti
         assert strategy_details['parameters']['momentum_threshold'] == '0.02'
         assert strategy_details['risk_controls']['max_position_size'] == '1000'
         assert strategy_details['risk_controls']['stop_loss_percent'] == '0.05'
-        assert strategy_details['status'] == StrategyStatus.INACTIVE.value
+        assert strategy_details['status'] == StrategyStatusEnum.INACTIVE.value
 
     # Step 3: Start the strategy
     async with client.post(
@@ -87,7 +87,7 @@ async def test_create_and_deploy_trading_strategy(client, config, mongo_connecti
         activated_strategy = await response.json()
 
         # Verify status changed to active
-        assert activated_strategy['status'] == StrategyStatus.ACTIVE.value
+        assert activated_strategy['status'] == StrategyStatusEnum.ACTIVE.value
         assert 'session_id' in activated_strategy or 'message' in activated_strategy
 
     # Step 4: Verify strategy is active
@@ -99,7 +99,7 @@ async def test_create_and_deploy_trading_strategy(client, config, mongo_connecti
         active_strategy = await response.json()
 
         # Final verification
-        assert active_strategy['status'] == StrategyStatus.ACTIVE.value
+        assert active_strategy['status'] == StrategyStatusEnum.ACTIVE.value
         assert active_strategy['strategy_id'] == strategy_id
 
 

@@ -6,7 +6,7 @@ Manages trading sessions lifecycle and session-level risk tracking.
 from decimal import Decimal
 from uuid import UUID
 
-from src.algo_trading.adapters.models import TradingSession
+from src.algo_trading.adapters.models import TradingSessionDocument
 
 
 class SessionManagerError(Exception):
@@ -20,7 +20,7 @@ class SessionManager:
     Handles session creation, updates, and queries.
     """
 
-    async def get_active_session(self, strategy_id: UUID) -> TradingSession | None:
+    async def get_active_session(self, strategy_id: UUID) -> TradingSessionDocument | None:
         """
         Get active session for strategy.
 
@@ -30,12 +30,12 @@ class SessionManager:
         Returns:
             Active TradingSession or None
         """
-        return await TradingSession.find_one(
-            TradingSession.strategy_id == strategy_id,
-            TradingSession.session_end == None,  # noqa: E711
+        return await TradingSessionDocument.find_one(
+            TradingSessionDocument.strategy_id == strategy_id,
+            TradingSessionDocument.session_end == None,  # noqa: E711
         )
 
-    async def get_session_by_id(self, session_id: UUID) -> TradingSession | None:
+    async def get_session_by_id(self, session_id: UUID) -> TradingSessionDocument | None:
         """
         Get session by ID.
 
@@ -45,14 +45,14 @@ class SessionManager:
         Returns:
             TradingSession or None
         """
-        return await TradingSession.get(session_id)
+        return await TradingSessionDocument.get(session_id)
 
     async def get_strategy_sessions(
         self,
         strategy_id: UUID,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[TradingSession]:
+    ) -> list[TradingSessionDocument]:
         """
         Get all sessions for strategy.
 
@@ -65,7 +65,7 @@ class SessionManager:
             List of trading sessions
         """
         return (
-            await TradingSession.find(TradingSession.strategy_id == strategy_id)
+            await TradingSessionDocument.find(TradingSessionDocument.strategy_id == strategy_id)
             .sort('-session_start')
             .skip(offset)
             .limit(limit)
@@ -81,7 +81,7 @@ class SessionManager:
         orders_rejected: int | None = None,
         total_pnl: Decimal | None = None,
         max_drawdown: Decimal | None = None,
-    ) -> TradingSession:
+    ) -> TradingSessionDocument:
         """
         Update session metrics.
 
@@ -100,7 +100,7 @@ class SessionManager:
         Raises:
             SessionManagerError: If session not found
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 
@@ -125,7 +125,7 @@ class SessionManager:
         self,
         session_id: UUID,
         pnl: Decimal,
-    ) -> TradingSession:
+    ) -> TradingSessionDocument:
         """
         Record a trade in session.
 
@@ -139,7 +139,7 @@ class SessionManager:
         Raises:
             SessionManagerError: If session not found or ended
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 
@@ -153,7 +153,7 @@ class SessionManager:
         await session.save()
         return session
 
-    async def record_risk_violation(self, session_id: UUID) -> TradingSession:
+    async def record_risk_violation(self, session_id: UUID) -> TradingSessionDocument:
         """
         Record a risk violation in session.
 
@@ -166,7 +166,7 @@ class SessionManager:
         Raises:
             SessionManagerError: If session not found
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 
@@ -187,7 +187,7 @@ class SessionManager:
         Raises:
             SessionManagerError: If session not found
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 
@@ -219,7 +219,7 @@ class SessionManager:
             This is a simplified calculation. For accurate Sharpe ratio,
             use PerformanceAnalytics service with trade history.
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 
@@ -248,7 +248,7 @@ class SessionManager:
         Raises:
             SessionManagerError: If session not found
         """
-        session = await TradingSession.get(session_id)
+        session = await TradingSessionDocument.get(session_id)
         if not session:
             raise SessionManagerError(f'Session {session_id} not found')
 

@@ -8,7 +8,7 @@ from beanie import Document
 from pydantic import Field, computed_field
 
 
-class PortfolioPosition(Document):
+class PortfolioPositionDocument(Document):
     """
     Current holdings and P&L for a trading instrument.
 

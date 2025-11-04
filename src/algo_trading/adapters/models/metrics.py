@@ -8,8 +8,10 @@ from beanie import Document
 from pydantic import Field, field_validator
 from pydantic_core.core_schema import ValidationInfo
 
+from src.algo_trading.adapters.models.common import DecimalField
 
-class PerformanceMetrics(Document):
+
+class PerformanceMetricsDocument(Document):
     """
     Strategy performance statistics and risk measures.
 
@@ -23,21 +25,21 @@ class PerformanceMetrics(Document):
     period_start: datetime = Field(description='Performance period start')
     period_end: datetime = Field(description='Performance period end')
 
-    total_return: Decimal = Field(description='Total return percentage (0.05 = 5%)')
-    annualized_return: Decimal = Field(description='Annualized return percentage')
+    total_return: DecimalField = Field(description='Total return percentage (0.05 = 5%)')
+    annualized_return: DecimalField = Field(description='Annualized return percentage')
 
-    sharpe_ratio: Decimal = Field(description='Risk-adjusted return (excess return / volatility)')
-    max_drawdown: Decimal = Field(description='Maximum peak-to-trough decline')
-    volatility: Decimal = Field(description='Return volatility (standard deviation)')
+    sharpe_ratio: DecimalField = Field(description='Risk-adjusted return (excess return / volatility)')
+    max_drawdown: DecimalField = Field(description='Maximum peak-to-trough decline')
+    volatility: DecimalField = Field(description='Return volatility (standard deviation)')
 
-    win_rate: Decimal = Field(ge=0, le=1, description='Percentage of profitable trades')
-    profit_factor: Decimal = Field(ge=0, description='Gross profit / gross loss ratio')
+    win_rate: DecimalField = Field(ge=0, le=1, description='Percentage of profitable trades')
+    profit_factor: DecimalField = Field(ge=0, description='Gross profit / gross loss ratio')
     trade_count: int = Field(ge=0, description='Number of trades in period')
 
-    average_win: Decimal = Field(default=Decimal('0'), description='Average winning trade')
-    average_loss: Decimal = Field(default=Decimal('0'), description='Average losing trade')
-    largest_win: Decimal = Field(default=Decimal('0'), description='Largest winning trade')
-    largest_loss: Decimal = Field(default=Decimal('0'), description='Largest losing trade')
+    average_win: DecimalField = Field(default=Decimal('0'), description='Average winning trade')
+    average_loss: DecimalField = Field(default=Decimal('0'), description='Average losing trade')
+    largest_win: DecimalField = Field(default=Decimal('0'), description='Largest winning trade')
+    largest_loss: DecimalField = Field(default=Decimal('0'), description='Largest losing trade')
 
     calculated_at: datetime = Field(default_factory=datetime.utcnow, description='Calculation timestamp')
 

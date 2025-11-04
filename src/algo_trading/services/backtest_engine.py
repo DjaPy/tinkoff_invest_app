@@ -8,7 +8,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from src.algo_trading.adapters.models.market_data import MarketData
+from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, PerformanceResult, Trade
 
 
@@ -116,7 +116,7 @@ class BacktestEngine:
         instruments: list[str],
         period_start: datetime,
         period_end: datetime,
-    ) -> dict[str, list[MarketData]]:
+    ) -> dict[str, list[MarketDataDocument]]:
         """
         Load historical market data for instruments.
 
@@ -132,10 +132,10 @@ class BacktestEngine:
 
         for instrument in instruments:
             market_data = (
-                await MarketData.find(
-                    MarketData.instrument == instrument,
-                    MarketData.timestamp >= period_start,
-                    MarketData.timestamp <= period_end,
+                await MarketDataDocument.find(
+                    MarketDataDocument.instrument == instrument,
+                    MarketDataDocument.timestamp >= period_start,
+                    MarketDataDocument.timestamp <= period_end,
                 )
                 .sort('timestamp')
                 .to_list()
@@ -148,7 +148,7 @@ class BacktestEngine:
     async def _simulate_strategy(
         self,
         config: BacktestConfig,
-        market_data: dict[str, list[MarketData]],
+        market_data: dict[str, list[MarketDataDocument]],
     ) -> tuple[list[dict], list[Decimal]]:
         """
         Simulate strategy execution on historical data.

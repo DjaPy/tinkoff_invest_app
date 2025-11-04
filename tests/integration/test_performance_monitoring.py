@@ -71,7 +71,6 @@ async def test_performance_monitoring_and_analytics(client, config, mongo_connec
         # Verify performance metrics structure
         assert 'total_return' in performance or 'metrics' in performance
 
-    # Step 3: View trade analytics
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/trades?period=1d',
         headers={'Authorization': 'Bearer test-token'},

@@ -5,8 +5,6 @@ This test validates the API contract for creating new trading strategies.
 It should FAIL until the actual endpoint implementation is complete.
 """
 
-from fastapi.testclient import TestClient
-
 
 # This will fail until the endpoint is implemented
 def test_post_strategies_creates_new_strategy():
@@ -53,7 +51,6 @@ def test_post_strategies_creates_new_strategy():
 
 def test_post_strategies_validates_required_fields():
     """Test POST /api/v1/strategies validates required fields"""
-    client = TestClient(app)
 
     # Missing required fields
     invalid_data = {
@@ -74,7 +71,6 @@ def test_post_strategies_validates_required_fields():
 
 def test_post_strategies_validates_risk_controls():
     """Test POST /api/v1/strategies validates risk control constraints"""
-    client = TestClient(app)
 
     strategy_data = {
         'name': 'Invalid Risk Strategy',
@@ -102,7 +98,6 @@ def test_post_strategies_validates_risk_controls():
 
 def test_post_strategies_unauthorized_without_token():
     """Test POST /api/v1/strategies requires authentication"""
-    client = TestClient(app)
 
     strategy_data = {
         'name': 'Test Strategy',
