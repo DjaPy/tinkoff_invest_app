@@ -1,14 +1,13 @@
-# pylint: disable=no-name-in-module
-
 import typing
 from http import HTTPStatus
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import Response, status
 from pydantic import BaseModel, ConfigDict, model_validator
 from starlette.background import BackgroundTask
 
 __all__ = [
+    'Conflict',
     'Forbidden',
     'InternalServerError',
     'NotFound',
@@ -16,18 +15,18 @@ __all__ = [
     'ProblemResponse',
     'Unauthorized',
     'UnprocessableEntity',
-    'ValidationError',
+    'ValidationErrorSchema',
 ]
 
 from typing_extensions import Annotated, TypedDict
 
 
 class Problem(BaseModel):
-    type: Optional[str] = None
-    title: Optional[str] = None
-    status: Optional[HTTPStatus] = None
-    detail: Optional[Any] = None
-    instance: Optional[str] = None
+    type: str | None = None
+    title: str | None = None
+    status: HTTPStatus | None = None
+    detail: Any | None = None
+    instance: str | None = None
     invalid_params: Annotated[Any | None, 'invalid-params'] = None
 
     model_config = ConfigDict(populate_by_name=True)
@@ -43,48 +42,51 @@ class Problem(BaseModel):
         return values
 
 
-class ValidationError(Problem):
+class ValidationErrorSchema(Problem):
     class Param(TypedDict):
         name: str
         reason: str
 
-    type: typing.Literal['validation-error'] = 'validation-error'
-    title: typing.Literal["Your request parameters didn't validate."] = "Your request parameters didn't validate."
-    status: typing.Literal[HTTPStatus.BAD_REQUEST] = HTTPStatus.BAD_REQUEST
+    type: str = 'validation-error'
+    title: str = "Your request parameters didn't validate."
+    status: HTTPStatus = HTTPStatus.BAD_REQUEST
     invalid_params: list[Param]
 
 
 class Unauthorized(Problem):
-    type: typing.Literal['unauthorized'] = 'unauthorized'
-    title: typing.Literal[
-        'The request has not been applied because it lacks valid authentication credentials for the target resource.'
-    ] = 'The request has not been applied because it lacks valid authentication credentials for the target resource.'
-    status: typing.Literal[HTTPStatus.UNAUTHORIZED] = HTTPStatus.UNAUTHORIZED
+    type: str = 'unauthorized'
+    title: str = ('The request has not been applied because it lacks valid '
+                  'authentication credentials for the target resource.')
+    status: HTTPStatus = HTTPStatus.UNAUTHORIZED
 
 
 class Forbidden(Problem):
-    type: typing.Literal['forbidden'] = 'forbidden'
-    title: typing.Literal[
-        'The server understood the request but refuses to authorize it.'
-    ] = 'The server understood the request but refuses to authorize it.'
-    status: typing.Literal[HTTPStatus.FORBIDDEN] = HTTPStatus.FORBIDDEN
+    type: str = 'forbidden'
+    title: str = 'The server understood the request but refuses to authorize it.'
+    status: HTTPStatus = HTTPStatus.FORBIDDEN
+
+
+class Conflict(Problem):
+    type: str = 'conflict'
+    title: str = 'The request could not be completed due to a conflict with the current state of the target resource.'
+    status: HTTPStatus = HTTPStatus.CONFLICT
 
 
 class NotFound(Problem):
-    type: typing.Literal['not-found'] = 'not-found'
-    title: typing.Literal['Requested resource is not available.'] = 'Requested resource is not available.'
-    status: typing.Literal[HTTPStatus.NOT_FOUND] = HTTPStatus.NOT_FOUND
+    type: str = 'not-found'
+    title: str = 'Requested resource is not available.'
+    status: HTTPStatus = HTTPStatus.NOT_FOUND
 
 
 class UnprocessableEntity(Problem):
     type: str
-    status: typing.Literal[HTTPStatus.UNPROCESSABLE_ENTITY] = HTTPStatus.UNPROCESSABLE_ENTITY
+    status: HTTPStatus = HTTPStatus.UNPROCESSABLE_ENTITY
 
 
 class InternalServerError(Problem):
-    type: typing.Literal['internal-server-error'] = 'internal-server-error'
-    title: typing.Literal['Internal server error.'] = 'Internal server error.'
-    status: typing.Literal[HTTPStatus.INTERNAL_SERVER_ERROR] = HTTPStatus.INTERNAL_SERVER_ERROR
+    type: str = 'internal-server-error'
+    title: str = 'Internal server error.'
+    status: HTTPStatus = HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 class ProblemResponse(Response):

@@ -10,12 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from algo_trading.adapters.models import (
-    ArbitrageParameters,
-    MarketMakingParameters,
-    MeanReversionParameters,
-    MomentumParameters,
-)
+from algo_trading.ports.api.v1.schemas.strategies_schema import StrategyParameters
 from src.algo_trading.adapters.models import (
     RiskControls,
     StrategyStatusEnum,
@@ -178,7 +173,7 @@ class StrategyManager:
     async def update_strategy(
         self,
         strategy_id: UUID,
-        parameters: MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters | None = None,
+        parameters: StrategyParameters | None = None,
         risk_controls: dict[str, Any] | None = None,
     ) -> TradingStrategyDocument:
         """

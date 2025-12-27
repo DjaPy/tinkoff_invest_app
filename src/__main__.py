@@ -10,12 +10,22 @@ from src.base.tinkoff_invest.service import TinkoffInvestServiceSandbox
 from src.config import config
 from src.consts import FASTAPI_SERVICE, MONGO_DB, TINKOFF_INVEST_SANDBOX
 from src.sandbox.entrypoint.api_v1.account import account_router
+from src.users.ports.api.v1.auth import auth_router
+from src.users.ports.api.v1.users import users_router
 
 fastapi_service = FastAPIService(
     settings=config.http,
     context_name=FASTAPI_SERVICE,
     app_name=config.app_name,
-    routers=[analytics_router, account_router, orders_router, positions_router, strategies_router],
+    routers=[
+        analytics_router,
+        account_router,
+        orders_router,
+        positions_router,
+        strategies_router,
+        auth_router,
+        users_router,
+    ],
 )
 tinkoff_invest_sandbox = TinkoffInvestServiceSandbox(
     settings=config.tinkoff_invest,

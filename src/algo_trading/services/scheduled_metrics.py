@@ -69,7 +69,7 @@ class ScheduledMetricsService(PeriodicService):
 
         # Find all active or deployed strategies
         strategies = await TradingStrategyDocument.find(
-            TradingStrategyDocument.status == StrategyStatusEnum.ACTIVE
+            TradingStrategyDocument.status == StrategyStatusEnum.ACTIVE,
         ).to_list()
 
         if not strategies:

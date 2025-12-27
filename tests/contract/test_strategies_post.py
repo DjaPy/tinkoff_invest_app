@@ -6,7 +6,7 @@ It should FAIL until the actual endpoint implementation is complete.
 """
 
 
-def test_post_strategies_creates_new_strategy():
+def test_post_strategies_creates_new_strategy(client):
     """Test POST /api/v1/strategies creates a new trading strategy"""
     # This test is designed to FAIL until implementation
 
@@ -34,7 +34,6 @@ def test_post_strategies_creates_new_strategy():
 
     response = client.post('/api/v1/strategies', json=strategy_data)
 
-    # Contract assertions
     assert response.status_code == 201
     assert 'application/json' in response.headers['content-type']
 
@@ -48,13 +47,10 @@ def test_post_strategies_creates_new_strategy():
     assert 'risk_controls' in data
 
 
-def test_post_strategies_validates_required_fields():
+def test_post_strategies_validates_required_fields(client):
     """Test POST /api/v1/strategies validates required fields"""
-
-    # Missing required fields
     invalid_data = {
         'name': 'Incomplete Strategy',
-        # Missing strategy_type, parameters, risk_controls
     }
 
     response = client.post('/api/v1/strategies', json=invalid_data)
@@ -68,7 +64,7 @@ def test_post_strategies_validates_required_fields():
     assert data['status'] == 422
 
 
-def test_post_strategies_validates_risk_controls():
+def test_post_strategies_validates_risk_controls(client):
     """Test POST /api/v1/strategies validates risk control constraints"""
 
     strategy_data = {
@@ -95,7 +91,7 @@ def test_post_strategies_validates_risk_controls():
     assert 'invalid_params' in data
 
 
-def test_post_strategies_unauthorized_without_token():
+def test_post_strategies_unauthorized_without_token(client):
     """Test POST /api/v1/strategies requires authentication"""
 
     strategy_data = {
@@ -115,7 +111,6 @@ def test_post_strategies_unauthorized_without_token():
         },
     }
 
-    # No Authorization header
     response = client.post('/api/v1/strategies', json=strategy_data)
 
     assert response.status_code == 401

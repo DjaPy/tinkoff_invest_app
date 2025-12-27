@@ -6,7 +6,7 @@ Orchestrates backtesting strategies against historical data.
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, PerformanceResult, Trade
@@ -47,7 +47,7 @@ class BacktestEngine:
     Simulates strategy execution on historical data.
     """
 
-    def __init__(self, calculator: Optional[PerformanceCalculator] = None) -> None:
+    def __init__(self, calculator: PerformanceCalculator | None = None) -> None:
         """
         Initialize BacktestEngine.
 

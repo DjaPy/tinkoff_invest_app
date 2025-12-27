@@ -8,6 +8,7 @@ from src.algo_trading.adapters.models import (
 )
 from src.algo_trading.adapters.models import RiskControls, StrategyTypeEnum, TradingStrategyDocument
 
+StrategyParameters = MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters
 
 class CreateStrategyRequestSchema(BaseModel):
     """Request schema for creating a new strategy."""
@@ -22,7 +23,7 @@ class UpdateStrategyRequestSchema(BaseModel):
     """Request schema for updating a strategy."""
 
     name: str | None = Field(None, min_length=1, max_length=100, description='Strategy name')
-    parameters: MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters | None = Field(None, description='Strategy-specific parameters')
+    parameters: StrategyParameters | None = Field(None, description='Strategy-specific parameters')
     risk_controls: RiskControls | None = Field(None, description='Risk management configuration')
 
 

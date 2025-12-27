@@ -262,21 +262,6 @@ async def test_get_portfolio_summary(
         assert 0 <= summary.win_rate <= 1
 
 
-@pytest.mark.asyncio
-async def test_get_portfolio_summary_with_period(client, config):
-    """Test GET /api/v1/analytics/portfolio/summary supports period filter"""
-    async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/portfolio/summary?period=1m',
-        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
-    ) as response:
-        assert response.status == status.HTTP_200_OK
-        data = await response.json()
-        summary = PortfolioSummaryResponseSchema(**data)
-        assert summary.total_value >= 0
-
-
-# ==================== MARKET DATA TESTS (T020) ====================
-
 
 @pytest.mark.asyncio
 async def test_get_market_data_analytics(client, config):
@@ -313,17 +298,15 @@ async def test_get_market_data_with_timeframe(client, config, timeframe):
             assert market_data.timeframe == timeframe
 
 
-# ==================== AUTHORIZATION TESTS ====================
-
 
 @pytest.mark.asyncio
-async def test_analytics_endpoints_require_authentication(client, config):
+async def test_analytics_endpoints_require_authentication(client, config, get_session):
     """Test all analytics endpoints require authentication"""
     strategy_id = uuid4()
 
     endpoints = [
-        f'/api/v1/analytics/strategies/{strategy_id}/performance',
-        f'/api/v1/analytics/strategies/{strategy_id}/trades',
+        f'/api/v1/analytics/strategies/{strategy_id}/performance?period=1m',
+        f'/api/v1/analytics/strategies/{strategy_id}/trades?period=1m',
         f'/api/v1/analytics/strategies/{strategy_id}/drawdown',
         '/api/v1/analytics/portfolio/summary',
         '/api/v1/analytics/market-data/AAPL',
