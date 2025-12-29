@@ -1,6 +1,6 @@
 import pytest
 
-from base.consts import FASTAPI
+from src.base.consts import FASTAPI
 from src.algo_trading.ports.api.v1 import analytics_router
 from src.base.fastapi_service import FastAPIService
 

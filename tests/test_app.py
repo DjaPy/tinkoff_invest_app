@@ -1,7 +1,7 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from tinkoff.invest import AccessLevel, AccountStatus, AccountType
+from t_tech.invest import AccessLevel, AccountStatus, AccountType
 
 from src.sandbox.collections import SandboxAccount
 

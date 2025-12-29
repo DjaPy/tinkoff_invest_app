@@ -3,10 +3,11 @@
 Provides real-time and historical market data using Tinkoff Invest API.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
-from tinkoff.invest import CandleInterval
+from t_tech.invest import CandleInterval
 
 from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
@@ -89,7 +90,6 @@ class MarketDataService:
             MarketDataError: If data fetch fails
         """
         try:
-            # Get instrument FIGI
             instrument = await self.client.get_instrument_by_ticker(ticker)
             figi = instrument['figi']
 
@@ -105,8 +105,7 @@ class MarketDataService:
 
             interval = interval_map.get(timeframe, CandleInterval.CANDLE_INTERVAL_DAY)
 
-            # Calculate time range based on limit and timeframe
-            to_time = datetime.utcnow()
+            to_time = datetime.now(timezone.utc)
             if timeframe == '1m':
                 from_time = to_time - timedelta(minutes=limit)
             elif timeframe == '5m':
@@ -117,13 +116,10 @@ class MarketDataService:
                 from_time = to_time - timedelta(hours=limit)
             elif timeframe == '1w':
                 from_time = to_time - timedelta(weeks=limit)
-            else:  # 1d
+            else:
                 from_time = to_time - timedelta(days=limit)
 
-            # Fetch candles from Tinkoff
             candles = await self.client.get_candles(figi=figi, interval=interval, from_time=from_time, to_time=to_time)
-
-            # Convert to MarketData models and save to database
             market_data_list = []
             for candle in candles:
                 market_data = MarketDataDocument(
@@ -194,17 +190,14 @@ class MarketDataService:
         Raises:
             MarketDataError: If data fetch fails
         """
-        # Try to get cached data
         cached_data = await self.get_cached_data(ticker, timeframe, limit)
 
-        # Check if cache is fresh enough
         if cached_data:
             latest = cached_data[0]
-            age = datetime.utcnow() - latest.timestamp
+            age = datetime.now(timezone.utc) - latest.timestamp
             if age.total_seconds() < max_age_minutes * 60:
                 return cached_data
 
-        # Cache is stale or empty, fetch new data
         return await self.get_historical_data(ticker, timeframe, limit)
 
     async def refresh_data(self, ticker: str, timeframe: str = '1d') -> None:
@@ -222,3 +215,49 @@ class MarketDataService:
             await self.get_historical_data(ticker, timeframe, limit=100)
         except Exception as e:
             raise MarketDataError(f'Failed to refresh data for {ticker}: {e}') from e
+
+    async def get_market_data_analytics(
+        self,
+        ticker: str,
+        timeframe: str = '1d',
+        limit: int = 100,
+        max_age_minutes: int = 60,
+    ) -> dict[str, Any]:
+        """
+        Get market data analytics with formatted data points.
+
+        Args:
+            ticker: Instrument ticker
+            timeframe: Timeframe
+            limit: Number of candles
+            max_age_minutes: Max cache age in minutes
+
+        Returns:
+            Dictionary with instrument, timeframe, data_points, indicators, last_updated
+
+        Raises:
+            MarketDataError: If data fetch fails
+        """
+        market_data_list = await self.get_or_fetch_data(ticker, timeframe, limit, max_age_minutes)
+
+        data_points = [
+            {
+                'timestamp': md.timestamp.isoformat(),
+                'open': float(md.open_price),
+                'high': float(md.high_price),
+                'low': float(md.low_price),
+                'close': float(md.close_price),
+                'volume': md.volume,
+            }
+            for md in market_data_list
+        ]
+
+        last_updated = market_data_list[0].timestamp if market_data_list else datetime.utcnow()
+
+        return {
+            'instrument': ticker,
+            'timeframe': timeframe,
+            'data_points': data_points,
+            'indicators': {},
+            'last_updated': last_updated,
+        }

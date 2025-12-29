@@ -1,7 +1,8 @@
 from aiomisc import get_context
-from fastapi import APIRouter
-from tinkoff.invest.async_services import AsyncServices
+from fastapi import APIRouter, Depends
+from t_tech.invest.async_services import AsyncServices
 
+from src.users.services.auth import get_current_active_user
 from src.consts import TINKOFF_INVEST
 from src.sandbox.access_layer.sandbox.account import (
     get_account_sandbox_data_by_account_id,
@@ -11,7 +12,10 @@ from src.sandbox.access_layer.sandbox.account import (
 from src.sandbox.collections import SandboxAccount
 from src.sandbox.entrypoint.api_v1.schemas.response_schemas import AccountsSandboxResponse
 
-account_router = APIRouter(prefix='/account')
+account_router = APIRouter(
+    prefix='/account',
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @account_router.post(path='/', response_model=SandboxAccount)

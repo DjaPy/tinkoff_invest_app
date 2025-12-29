@@ -7,11 +7,11 @@ from decimal import Decimal
 from typing import Any
 
 from aiomisc import get_context
-from tinkoff.invest import CandleInterval, InstrumentIdType, OrderDirection
-from tinkoff.invest import OrderType as TinkoffOrderType
-from tinkoff.invest import Quotation
-from tinkoff.invest.async_services import AsyncServices
-from tinkoff.invest.schemas import MoneyValue
+from t_tech.invest import CandleInterval, InstrumentIdType, OrderDirection
+from t_tech.invest import OrderType as TinkoffOrderType
+from t_tech.invest import Quotation
+from t_tech.invest.async_services import AsyncServices
+from t_tech.invest.schemas import MoneyValue
 
 from src.algo_trading.adapters.models import OrderSideEnum, OrderTypeEnum
 

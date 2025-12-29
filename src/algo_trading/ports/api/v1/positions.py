@@ -8,12 +8,17 @@ Following FastAPI patterns and RFC7807 error handling.
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from src.users.services.auth import get_current_active_user
 from src.algo_trading.adapters.models.position import PortfolioPositionDocument
 from src.algo_trading.ports.api.v1.schemas.positions_schema import PositionListResponseSchema
 
-positions_router = APIRouter(prefix='/api/v1/positions', tags=['Portfolio'])
+positions_router = APIRouter(
+    prefix='/api/v1/positions',
+    tags=['Portfolio'],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @positions_router.get(

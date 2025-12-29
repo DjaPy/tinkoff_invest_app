@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 import pytest
 
-from algo_trading.enums import OrderSideEnum, OrderStatusEnum, OrderTypeEnum
+from src.algo_trading.enums import OrderSideEnum, OrderStatusEnum, OrderTypeEnum
 from src.algo_trading.adapters.models import (
     ArbitrageParameters,
     MarketMakingParameters,

@@ -1,59 +1,52 @@
-"""
-Contract test for POST /api/v1/analytics/backtest endpoint (T021)
-
-This test validates the API contract for running strategy backtests.
-It should FAIL until the actual endpoint implementation is complete.
-
-Following TDD approach - tests written before implementation.
-"""
-
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
 from starlette import status
 
+from algo_trading.adapters.models import RiskControls
+from algo_trading.enums import StrategyTypeEnum
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
-    BacktestResults,
+    BacktestRequestSchema,
+    BacktestResultsSchema,
 )
 
 
 @pytest.mark.asyncio
-async def test_post_backtest_runs_strategy_backtest(client, config):
+async def test_post_backtest_runs_strategy_backtest(client, config, mock_auth):
     """Test POST /api/v1/analytics/backtest runs a backtest"""
-    backtest_request = {
-        'strategy_type': 'momentum',
-        'parameters': {'lookback_period': 20, 'momentum_threshold': 0.02, 'position_size': 100},
-        'instruments': ['AAPL', 'MSFT'],
-        'start_date': (datetime.utcnow() - timedelta(days=365)).isoformat(),
-        'end_date': datetime.utcnow().isoformat(),
-        'initial_capital': str(Decimal('100000')),
-        'risk_controls': {
-            'max_position_size': str(Decimal('10000')),
-            'max_portfolio_value': str(Decimal('100000')),
-            'stop_loss_percent': str(Decimal('0.05')),
-            'max_drawdown_percent': str(Decimal('0.10')),
-            'daily_loss_limit': str(Decimal('1000')),
-            'max_orders_per_day': 20,
-            'trading_hours_start': '09:30:00',
-            'trading_hours_end': '16:00:00',
-            'enabled': True,
-        },
-    }
+    backtest_request = BacktestRequestSchema(
+        strategy_type=StrategyTypeEnum.MOMENTUM,
+        parameters={'lookback_period': 20, 'momentum_threshold': 0.02, 'position_size': 100},
+        instruments=['AAPL', 'MSFT'],
+        start_date=datetime.now(timezone.utc) - timedelta(days=365),
+        end_date=datetime.now(timezone.utc),
+        initial_capital=Decimal('100000'),
+        risk_controls=RiskControls(
+            max_position_size=Decimal('10000'),
+            max_portfolio_value=Decimal('100000'),
+            stop_loss_percent=Decimal('0.05'),
+            max_drawdown_percent=Decimal('0.10'),
+            daily_loss_limit=Decimal('1000'),
+            max_orders_per_day=20,
+            trading_hours_start='09:30:00',
+            trading_hours_end='16:00:00',
+            enabled=True,
+        ),
+    )
 
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/backtest',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
-        json=backtest_request,
+        json=backtest_request.model_json_schema(),
     ) as response:
-        # Contract assertions
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
         # Validate response using Pydantic model
-        results = BacktestResults(**data)
+        results = BacktestResultsSchema(**data)
         assert results.backtest_id is not None
         assert results.strategy_type == backtest_request['strategy_type']
         assert results.initial_capital == Decimal(backtest_request['initial_capital'])
@@ -242,5 +235,5 @@ async def test_post_backtest_supports_different_strategy_types(client, config, s
     ) as response:
         if response.status == status.HTTP_200_OK:
             data = await response.json()
-            results = BacktestResults(**data)
+            results = BacktestResultsSchema(**data)
             assert results.strategy_type == strategy_type

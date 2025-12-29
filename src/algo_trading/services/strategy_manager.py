@@ -10,7 +10,13 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from algo_trading.ports.api.v1.schemas.strategies_schema import StrategyParameters
+from algo_trading.adapters.models import (
+    ArbitrageParameters,
+    MarketMakingParameters,
+    MeanReversionParameters,
+    MomentumParameters,
+)
+from src.algo_trading.ports.api.v1.schemas.strategies_schema import StrategyParameters
 from src.algo_trading.adapters.models import (
     RiskControls,
     StrategyStatusEnum,
@@ -86,9 +92,9 @@ class StrategyManager:
         self,
         name: str,
         strategy_type: StrategyTypeEnum,
-        parameters: dict,
-        risk_controls: dict,
-        created_by: str,
+        parameters: MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters,
+        risk_controls: RiskControls,
+        created_by: UUID,
     ) -> TradingStrategyDocument:
         """
         Create a new trading strategy.
@@ -110,13 +116,12 @@ class StrategyManager:
         if any(s.name == name for s in existing):
             raise StrategyManagerError(f"Strategy '{name}' already exists for user {created_by}")
 
-        risk_controls_model = RiskControls(**risk_controls)
 
         strategy = TradingStrategyDocument(
             name=name,
             strategy_type=strategy_type,
             parameters=parameters,
-            risk_controls=risk_controls_model,
+            risk_controls=risk_controls,
             created_by=created_by,
         )
 
@@ -147,7 +152,7 @@ class StrategyManager:
 
     async def list_strategies(
         self,
-        created_by: str | None = None,
+        created_by: UUID | None = None,
         status: StrategyStatusEnum | None = None,
         limit: int = 100,
         offset: int = 0,
@@ -341,13 +346,12 @@ class StrategyManager:
         Returns:
             RiskLimits domain object
         """
-        rc = strategy.risk_controls
 
         return RiskLimits(
-            max_position_size=rc.max_position_size,
-            max_portfolio_value=rc.max_portfolio_value,
-            stop_loss_percent=rc.stop_loss_percent,
-            max_drawdown_percent=rc.max_drawdown_percent,
-            daily_loss_limit=rc.daily_loss_limit,
-            max_orders_per_day=rc.max_orders_per_day,
+            max_position_size=strategy.risk_controls.max_position_size,
+            max_portfolio_value=strategy.risk_controls.max_portfolio_value,
+            stop_loss_percent=strategy.risk_controls.stop_loss_percent,
+            max_drawdown_percent=strategy.risk_controls.max_drawdown_percent,
+            daily_loss_limit=strategy.risk_controls.daily_loss_limit,
+            max_orders_per_day=strategy.risk_controls.max_orders_per_day,
         )

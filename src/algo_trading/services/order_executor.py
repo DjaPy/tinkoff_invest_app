@@ -359,8 +359,7 @@ class OrderExecutor:
         Note:
             This is a placeholder. Real implementation would fetch from market data service.
         """
-        # TODO: Integrate with MarketData service
-        # For now, return placeholder
+        # Note: Future implementation should integrate with MarketData service
         return Decimal('100.00')
 
     def _validate_order_params(

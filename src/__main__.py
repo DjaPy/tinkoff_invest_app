@@ -50,13 +50,4 @@ if __name__ == '__main__':
         policy=asyncio.DefaultEventLoopPolicy(),
         debug=False,
     ) as loop:
-        # Register existing routers
-        fastapi_service.fastapi.include_router(account_router)
-
-        # Register algo_trading routers
-        fastapi_service.fastapi.include_router(strategies_router)
-        fastapi_service.fastapi.include_router(orders_router)
-        fastapi_service.fastapi.include_router(positions_router)
-        fastapi_service.fastapi.include_router(analytics_router)
-
         loop.run_forever()

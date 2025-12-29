@@ -8,8 +8,11 @@ Following FastAPI patterns and RFC7807 error handling.
 from datetime import UTC, datetime
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
+from src.users.adapters.dto_models.users import UserData
+from src.users.services.auth import get_current_active_user
+from src.algo_trading.adapters.repositories.strategy_repository import StrategyRepository
 from src.algo_trading.enums import StrategyStatusEnum
 from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
@@ -18,7 +21,11 @@ from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
     UpdateStrategyRequestSchema,
 )
 
-strategies_router = APIRouter(prefix='/api/v1/strategies', tags=['Trading Strategies'])
+strategies_router = APIRouter(
+    prefix='/api/v1/strategies',
+    tags=['Trading Strategies'],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @strategies_router.post(
@@ -28,12 +35,16 @@ strategies_router = APIRouter(prefix='/api/v1/strategies', tags=['Trading Strate
     summary='Create new trading strategy',
     description='Create a new algorithmic trading strategy with configuration and risk controls',
 )
-async def create_strategy(request: CreateStrategyRequestSchema) -> TradingStrategyDocument:
+async def create_strategy(
+    request: CreateStrategyRequestSchema,
+    current_user: UserData = Depends(get_current_active_user),
+) -> TradingStrategyDocument:
     """
     Create a new trading strategy (T042).
 
     Args:
         request: Strategy creation request with parameters and risk controls
+        current_user: Authenticated user from JWT token
 
     Returns:
         Created strategy with unique ID and inactive status
@@ -42,21 +53,15 @@ async def create_strategy(request: CreateStrategyRequestSchema) -> TradingStrate
         HTTPException 422: Validation error in request data
         HTTPException 500: Internal server error
     """
-    # TODO: Implement strategy creation logic using StrategyManager service
-    # For now, create a strategy directly (will be replaced with service call)
-
     strategy = TradingStrategyDocument(
         name=request.name,
         strategy_type=request.strategy_type,
         parameters=request.parameters,
         risk_controls=request.risk_controls,
-        created_by='test-user',  # TODO: Get from auth token
+        created_by=current_user.user_id,
     )
 
-    # TODO: Save to database via repository
-    await strategy.insert()
-
-    return strategy
+    return await StrategyRepository.create(strategy)
 
 
 @strategies_router.get(
@@ -65,9 +70,14 @@ async def create_strategy(request: CreateStrategyRequestSchema) -> TradingStrate
     summary='List all trading strategies',
     description='Retrieve all trading strategies for the authenticated user',
 )
-async def list_strategies() -> StrategyListResponseSchema:
+async def list_strategies(
+    current_user: UserData = Depends(get_current_active_user),
+) -> StrategyListResponseSchema:
     """
     List all trading strategies (T043).
+
+    Args:
+        current_user: Authenticated user from JWT token
 
     Returns:
         List of strategies with total count
@@ -75,10 +85,7 @@ async def list_strategies() -> StrategyListResponseSchema:
     Raises:
         HTTPException 500: Internal server error
     """
-    # TODO: Implement filtering by user from auth token
-    # TODO: Use repository to fetch strategies
-
-    strategies = await TradingStrategyDocument.find_all().to_list()
+    strategies = await StrategyRepository.find_all(created_by=current_user.user_id)
 
     return StrategyListResponseSchema(strategies=strategies, total=len(strategies))
 
@@ -150,10 +157,7 @@ async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) 
 
     strategy.updated_at = datetime.now(UTC)
 
-    # TODO: Save via repository
-    await strategy.save()
-
-    return strategy
+    return await StrategyRepository.update(strategy)
 
 
 @strategies_router.delete(
@@ -186,8 +190,7 @@ async def delete_strategy(strategy_id: UUID) -> None:
             detail='Cannot delete active strategy. Stop the strategy first.',
         )
 
-    # TODO: Delete via repository (cascade delete related data)
-    await strategy.delete()
+    await StrategyRepository.delete(strategy)
 
 
 @strategies_router.post(
@@ -222,7 +225,6 @@ async def start_strategy(strategy_id: UUID) -> TradingStrategyDocument:
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
-    # TODO: Use StrategyManager service to start execution
     await strategy.save()
 
     return strategy
@@ -253,7 +255,6 @@ async def stop_strategy(strategy_id: UUID) -> TradingStrategyDocument:
     if not strategy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
-    # TODO: Use StrategyManager service to stop execution and close positions
     strategy.update_status(StrategyStatusEnum.STOPPED)
     await strategy.save()
 
@@ -285,7 +286,6 @@ async def pause_strategy(strategy_id: UUID) -> TradingStrategyDocument:
     if not strategy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
-    # TODO: Use StrategyManager service to pause execution
     strategy.update_status(StrategyStatusEnum.PAUSED)
     await strategy.save()
 

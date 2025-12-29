@@ -40,9 +40,6 @@ async def test_backtest_workflow(client, config, mongo_connection):
     ) as response:
         assert response.status == HTTPStatus.OK
         backtest_results = await response.json()
-
-        # Step 2 & 3: Verify backtest results structure
-        # Results should include performance metrics
         assert 'total_return' in backtest_results or 'results' in backtest_results
         assert 'sharpe_ratio' in backtest_results or 'metrics' in backtest_results
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from beanie import Document
-from tinkoff.invest import AccessLevel, AccountStatus, AccountType
+from t_tech.invest import AccessLevel, AccountStatus, AccountType
 
 
 class SandboxAccount(Document):

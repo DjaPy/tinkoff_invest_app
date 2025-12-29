@@ -6,16 +6,21 @@ Following FastAPI patterns and RFC7807 error handling.
 """
 
 from datetime import datetime
-from typing import Any
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
+from src.users.services.auth import get_current_active_user
 from src.algo_trading.enums import OrderStatusEnum
 from src.algo_trading.adapters.models.order import TradeOrderDocument
+from src.algo_trading.services.order_executor import OrderExecutor
 
-orders_router = APIRouter(prefix='/api/v1/orders', tags=['Trade Orders'])
+orders_router = APIRouter(
+    prefix='/api/v1/orders',
+    tags=['Trade Orders'],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 
@@ -60,35 +65,22 @@ async def list_orders(
         HTTPException 422: Invalid query parameters
         HTTPException 500: Internal server error
     """
-
-    query: dict[str, Any] = {}
+    query = TradeOrderDocument.find()
 
     if strategy_id:
-        query['strategy_id'] = strategy_id
+        query = query.find(TradeOrderDocument.strategy_id == strategy_id)
 
     if status_filter:
-        query['status'] = status_filter
+        query = query.find(TradeOrderDocument.status == status_filter)
 
-    # TODO: Add date range filtering
-    # TODO: Implement proper filtering with Beanie query builder
-
-    all_orders = await TradeOrderDocument.find_all().to_list()
-
-    # Apply filters
-    filtered_orders = all_orders
-    if strategy_id:
-        filtered_orders = [o for o in filtered_orders if o.strategy_id == strategy_id]
-    if status_filter:
-        filtered_orders = [o for o in filtered_orders if o.status == status_filter]
     if from_date:
-        filtered_orders = [o for o in filtered_orders if o.submitted_at >= from_date]
+        query = query.find(TradeOrderDocument.submitted_at >= from_date)
+
     if to_date:
-        filtered_orders = [o for o in filtered_orders if o.submitted_at <= to_date]
+        query = query.find(TradeOrderDocument.submitted_at <= to_date)
 
-    total = len(filtered_orders)
-
-    # Apply pagination
-    paginated_orders = filtered_orders[offset : offset + limit]
+    total = await query.count()
+    paginated_orders = await query.skip(offset).limit(limit).to_list()
 
     return OrderListResponseSchema(orders=paginated_orders, total=total, limit=limit, offset=offset)
 
@@ -154,13 +146,9 @@ async def cancel_order(order_id: UUID) -> TradeOrderDocument:
             detail=f'Order cannot be cancelled. Current status: {order.status}',
         )
 
-    # Update order status to cancelled
+    # Cancel order via OrderExecutor service
+    executor = OrderExecutor()
     try:
-        order.update_status(OrderStatusEnum.CANCELLED)
+        return await executor.cancel_order(order_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-    # TODO: Call OrderExecutor service to cancel order with broker
-    await order.save()
-
-    return order

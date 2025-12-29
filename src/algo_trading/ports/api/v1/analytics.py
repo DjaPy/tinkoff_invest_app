@@ -7,19 +7,29 @@ Following FastAPI patterns and RFC7807 error handling.
 
 from datetime import datetime
 from decimal import Decimal
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from config import config
+from src.base.fastapi_service.problem import (
+    InternalServerError,
+    UnprocessableEntity,
+    ValidationErrorSchema,
+)
+from src.users.services.auth import get_current_active_user
 from src.algo_trading.adapters.repositories.strategy_repository import StrategyRepository
 from src.algo_trading.enums import PeriodEnum
 from src.algo_trading.services.performance_analytics import PerformanceAnalytics
 from src.algo_trading.services.trade_analytics import TradeAnalytics
 from src.algo_trading.services.portfolio_analytics import PortfolioAnalytics
 from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
+from src.algo_trading.services.backtest_engine import BacktestConfig, BacktestEngine
+from src.algo_trading.services.market_data import MarketDataService, MarketDataError
+from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
     BacktestRequestSchema,
-    BacktestResults,
+    BacktestResultsSchema,
     calculate_period_dates,
     check_period,
     DrawdownAnalysisResponseSchema,
@@ -30,7 +40,12 @@ from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
     TradeAnalyticsResponseSchema,
 )
 
-analytics_router = APIRouter(prefix='/api/v1/analytics', tags=['Analytics'])
+
+analytics_router = APIRouter(
+    prefix='/api/v1/analytics',
+    tags=['Analytics'],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @analytics_router.get(
@@ -317,71 +332,84 @@ async def get_market_data(
         HTTPException 404: Instrument not found
         HTTPException 500: Internal server error
     """
-    # TODO: Implement actual market data fetching and indicator calculation
-    # Mock response
-    return MarketDataAnalyticsResponseSchema(
-        instrument=instrument,
-        timeframe=timeframe or '1d',
-        data_points=[
-            {'timestamp': '2024-01-01', 'open': 150.0, 'high': 155.0, 'low': 148.0, 'close': 153.0, 'volume': 1000000},
-            {'timestamp': '2024-01-02', 'open': 153.0, 'high': 157.0, 'low': 152.0, 'close': 156.0, 'volume': 1200000},
-        ],
-        indicators={
-            'sma_20': 154.5,
-            'sma_50': 152.3,
-            'rsi_14': 65.2,
-            'macd': {'value': 2.1, 'signal': 1.8, 'histogram': 0.3},
-        },
-        last_updated=datetime.utcnow(),
+    tinkoff_client = TinkoffInvestClient(
+        account_id=config.tinkoff_invest.account,
+        context_name=config.tinkoff_invest.sandbox_token,
     )
+    market_data_service = MarketDataService(tinkoff_client)
+
+    try:
+        timeframe_str = timeframe or '1d'
+        analytics_data = await market_data_service.get_market_data_analytics(
+            ticker=instrument,
+            timeframe=timeframe_str,
+            limit=limit,
+            max_age_minutes=60,
+        )
+
+        return MarketDataAnalyticsResponseSchema(**analytics_data)
+    except MarketDataError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Failed to fetch market data for {instrument}: {e}',
+        ) from e
 
 
 @analytics_router.post(
     '/backtest',
-    response_model=BacktestResults,
+    response_model=BacktestResultsSchema,
     summary='Run strategy backtest',
+    responses={
+        status.HTTP_200_OK: {'model': BacktestResultsSchema},
+        status.HTTP_400_BAD_REQUEST: {'model': ValidationErrorSchema},
+        status.HTTP_422_UNPROCESSABLE_CONTENT: {'model': UnprocessableEntity},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {'model': InternalServerError},
+    },
     description='Run historical backtest for a trading strategy configuration',
 )
-async def run_backtest(request: BacktestRequestSchema) -> BacktestResults:
+async def run_backtest(request: BacktestRequestSchema) -> BacktestResultsSchema:
     """
-    Run strategy backtest (T059).
+    Run strategy backtest.
 
     Args:
         request: Backtest configuration with strategy parameters and date range
-
     Returns:
         Backtest results with performance metrics
-
     Raises:
         HTTPException 400: Invalid backtest parameters
         HTTPException 422: Validation error in request data
         HTTPException 500: Internal server error
     """
-    # Validate date range
     if request.end_date <= request.start_date:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='end_date must be after start_date')
 
-    # TODO: Implement actual backtest using BacktestEngine service
-    # Mock response
-    backtest_id = str(uuid4())
+    engine = BacktestEngine()
 
-    # Calculate mock returns
-    total_return = Decimal('0.25')  # 25% return
-    final_capital = request.initial_capital * (Decimal('1') + total_return)
-
-    return BacktestResults(
-        backtest_id=backtest_id,
+    config = BacktestConfig(
         strategy_type=request.strategy_type.value,
-        start_date=request.start_date,
-        end_date=request.end_date,
-        initial_capital=request.initial_capital,
+        parameters=request.parameters,
+        instruments=request.instruments,
+        period_start=request.start_date,
+        period_end=request.end_date,
+        starting_capital=request.initial_capital,
+        commission_rate=Decimal('0.001'),
+    )
+    result = await engine.run_backtest(config)
+
+    final_capital = result.config.starting_capital * (Decimal('1') + result.performance.total_return)
+
+    return BacktestResultsSchema(
+        strategy_type=result.config.strategy_type,
+        start_date=result.config.period_start,
+        end_date=result.config.period_end,
+        initial_capital=result.config.starting_capital,
         final_capital=final_capital,
-        total_return=total_return,
-        sharpe_ratio=Decimal('2.1'),
-        max_drawdown=Decimal('-0.12'),  # -12%
-        win_rate=Decimal('0.68'),  # 68%
-        total_trades=150,
-        profit_factor=Decimal('3.2'),
+        total_return=result.performance.total_return,
+        sharpe_ratio=result.performance.sharpe_ratio,
+        max_drawdown=result.performance.max_drawdown,
+        win_rate=result.performance.win_rate,
+        total_trades=len(result.trades),
+        profit_factor=result.performance.profit_factor,
     )
 
 

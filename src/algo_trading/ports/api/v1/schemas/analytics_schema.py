@@ -92,7 +92,7 @@ class BacktestRequestSchema(BaseModel):
     """Request schema for running a backtest."""
 
     strategy_type: StrategyTypeEnum = Field(description='Type of strategy to backtest')
-    parameters: dict = Field(description='Strategy parameters')
+    parameters: dict[str, Any] = Field(description='Strategy parameters')
     instruments: list[str] = Field(min_length=1, description='Trading instruments')
     start_date: datetime = Field(description='Backtest start date')
     end_date: datetime = Field(description='Backtest end date')
@@ -100,10 +100,9 @@ class BacktestRequestSchema(BaseModel):
     risk_controls: RiskControls = Field(description='Risk management parameters')
 
 
-class BacktestResults(BaseModel):
+class BacktestResultsSchema(BaseModel):
     """Response schema for backtest results."""
 
-    backtest_id: str = Field(description='Unique backtest run identifier')
     strategy_type: str = Field(description='Strategy type tested')
     start_date: datetime = Field(description='Backtest period start')
     end_date: datetime = Field(description='Backtest period end')

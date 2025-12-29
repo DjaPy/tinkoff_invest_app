@@ -7,7 +7,11 @@ from src.users.services.auth import get_current_active_user
 from src.users.services.users_service import UsersService
 from src.users.ports.api.v1.schemas.response_schemas import UsersResponseSchema, UserResponseSchema
 
-users_router = APIRouter(prefix='/users', tags=["Users"])
+users_router = APIRouter(
+    prefix='/users',
+    tags=["Users"],
+    dependencies=[Depends(get_current_active_user)],
+)
 
 
 @users_router.get(

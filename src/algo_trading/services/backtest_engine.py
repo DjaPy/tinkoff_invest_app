@@ -4,7 +4,7 @@ Orchestrates backtesting strategies against historical data.
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 
@@ -43,7 +43,6 @@ class BacktestEngineError(Exception):
 class BacktestEngine:
     """
     Application service for strategy backtesting.
-
     Simulates strategy execution on historical data.
     """
 
@@ -69,9 +68,7 @@ class BacktestEngine:
         Raises:
             BacktestEngineError: If backtest fails
         """
-        start_time = datetime.utcnow()
-
-        # Load historical market data
+        start_time = datetime.now(timezone.utc)
         market_data = await self._load_market_data(
             instruments=config.instruments,
             period_start=config.period_start,
@@ -81,16 +78,10 @@ class BacktestEngine:
         if not market_data:
             raise BacktestEngineError('No market data found for backtest period')
 
-        # Simulate strategy execution
         trades, equity_curve = await self._simulate_strategy(config, market_data)
-
-        # Calculate performance metrics
         trade_objs = [Trade(pnl=t['pnl'], return_pct=t['return_pct']) for t in trades]
-
         daily_returns = self._calculate_daily_returns(equity_curve)
-
         days = (config.period_end - config.period_start).days
-
         performance = self.calculator.calculate_performance(
             starting_capital=config.starting_capital,
             ending_capital=equity_curve[-1] if equity_curve else config.starting_capital,

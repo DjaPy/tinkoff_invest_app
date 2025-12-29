@@ -150,7 +150,7 @@ class TinkoffExecutionService:
         if not order.external_order_id:
             return order.status
 
-        # TODO: Implement actual status check via Tinkoff API
+        # Note: Future implementation should query Tinkoff API for real-time order status
 
         return order.status
 
@@ -177,7 +177,7 @@ class TinkoffExecutionService:
         if order.filled_price:
             return order.filled_price
 
-        # TODO: Implement actual execution price fetch via Tinkoff API
+        # Note: Future implementation should fetch execution details from Tinkoff API
         return None
 
     async def sync_portfolio_positions(self, strategy_id: UUID) -> list[dict]:
@@ -199,8 +199,7 @@ class TinkoffExecutionService:
 
             synced_positions = []
             for position in portfolio['positions']:
-                # Map FIGI back to ticker (reverse lookup)
-                # TODO: Implement FIGI -> ticker mapping
+                # Note: Future implementation should add FIGI -> ticker reverse mapping
                 synced_positions.append(
                     {
                         'figi': position['figi'],

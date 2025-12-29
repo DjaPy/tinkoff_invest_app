@@ -1,19 +1,25 @@
 import logging
 import uuid
 from contextlib import contextmanager
+from datetime import timedelta
+from decimal import Decimal
 from functools import partial
 from typing import Any, Callable, TypeVar
 
 import pytest
 import rstr
 from aiohttp import request
+from aiomisc import get_context
 from beanie import init_beanie
 from faker import Faker
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 
+from src.base.consts import FASTAPI
 from src.algo_trading.adapters.models import BEANIE_MODELS
 from src.config import config as build_config
+from src.users.adapters.dto_models.users import UserData
+from src.users.services.auth import get_current_user
 
 pytest_plugins = [
     'fixtures_db_data',
@@ -167,3 +173,145 @@ async def client():
             return partial(request, method=item)
 
     return _Client()
+
+
+@pytest.fixture
+async def mock_auth():
+    fastapi = await get_context()[FASTAPI]
+    fastapi.dependency_overrides[get_current_user] = lambda: UserData(
+        user_id=uuid.uuid4(),
+        username='test_user',
+        email='test@test.com',
+        full_name='Test User',
+        disabled=False,
+        hashed_password='',
+    )
+    yield
+    fastapi.dependency_overrides = {}
+
+class MockTinkoffClient:
+
+    def __init__(self, account_id: str | None = None, context_name: str | None = None):
+        self._account_id = account_id or str(uuid.uuid4())
+        self._context_name = context_name or 'sandbox'
+        self._instruments = {}
+        self._prices = {}
+        self._candles_data = {}
+
+    async def get_instrument_by_ticker(self, ticker: str) -> dict:
+        if ticker in self._instruments:
+            return self._instruments[ticker]
+
+        instrument_data = {
+            'figi': f'BBG{fake.random_number(digits=9, fix_len=True)}',
+            'ticker': ticker,
+            'name': fake.company(),
+            'currency': 'rub',
+            'lot': fake.random_int(min=1, max=100),
+            'min_price_increment': Decimal(fake.random_element(elements=('0.01', '0.1', '1'))),
+        }
+        self._instruments[ticker] = instrument_data
+        return instrument_data
+
+    async def get_last_price(self, figi: str) -> Decimal:
+        """Mock get last price by FIGI."""
+        if figi in self._prices:
+            return self._prices[figi]
+
+        price = Decimal(str(fake.pyfloat(min_value=100, max_value=10000, right_digits=2)))
+        self._prices[figi] = price
+        return price
+
+    async def get_market_price(self, ticker: str) -> Decimal:
+        """Mock get market price by ticker."""
+        instrument = await self.get_instrument_by_ticker(ticker)
+        return await self.get_last_price(instrument['figi'])
+
+    async def place_order(
+            self,
+            figi: str,
+            quantity: int,
+            order_type,
+            side,
+            price: Decimal = Decimal('0'),
+    ) -> dict:
+        """Mock place order."""
+        return {
+            'external_order_id': str(uuid.uuid4()),
+            'figi': figi,
+            'direction': str(side),
+            'initial_order_price': price if price else await self.get_last_price(figi),
+            'lots_requested': quantity,
+            'lots_executed': 0,
+        }
+
+    async def cancel_order(self, order_id: str) -> bool:
+        """Mock cancel order."""
+        return True
+
+    async def get_portfolio(self) -> dict:
+        """Mock get portfolio."""
+        return {
+            'positions': [],
+            'total_value': Decimal('1000000.00'),
+            'currency': 'rub',
+        }
+
+    async def get_account_info(self) -> dict:
+        """Mock get account info."""
+        return {
+            'account_id': self._account_id,
+            'name': fake.name(),
+            'type': 'ACCOUNT_TYPE_TINKOFF',
+            'status': 'ACCOUNT_STATUS_OPEN',
+            'access_level': 'ACCOUNT_ACCESS_LEVEL_FULL_ACCESS',
+        }
+
+    async def get_candles(
+            self,
+            figi: str,
+            interval,
+            from_time,
+            to_time,
+    ) -> list[dict]:
+        """Mock get candles."""
+        # Generate realistic candle data
+        candles = []
+        current_time = from_time
+        base_price = Decimal('1000.00')
+
+        while current_time < to_time:
+            open_price = base_price + Decimal(str(fake.pyfloat(min_value=-10, max_value=10, right_digits=2)))
+            high_price = open_price + Decimal(str(fake.pyfloat(min_value=0, max_value=20, right_digits=2)))
+            low_price = open_price - Decimal(str(fake.pyfloat(min_value=0, max_value=20, right_digits=2)))
+            close_price = Decimal(str(fake.pyfloat(
+                min_value=float(low_price),
+                max_value=float(high_price),
+                right_digits=2,
+            )))
+
+            candles.append({
+                'time': current_time,
+                'open': open_price,
+                'high': high_price,
+                'low': low_price,
+                'close': close_price,
+                'volume': fake.random_int(min=1000, max=1000000),
+            })
+
+            base_price = close_price
+            current_time += timedelta(days=1)
+
+        return candles
+
+    def set_instrument(self, ticker: str, data: dict):
+        """Helper: Set custom instrument data for testing."""
+        self._instruments[ticker] = data
+
+    def set_price(self, figi: str, price: Decimal):
+        """Helper: Set custom price for testing."""
+        self._prices[figi] = price
+
+@pytest.fixture
+def mock_tinkoff_client(fake: Faker) -> MockTinkoffClient:
+    return MockTinkoffClient()

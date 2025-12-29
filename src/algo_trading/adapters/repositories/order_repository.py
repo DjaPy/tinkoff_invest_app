@@ -9,8 +9,8 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from algo_trading.adapters.models import TradeOrderDocument
-from algo_trading.enums import OrderStatusEnum
+from src.algo_trading.adapters.models import TradeOrderDocument
+from src.algo_trading.enums import OrderStatusEnum
 from src.algo_trading.adapters.dto_models.order_dto import OrderDTO
 
 

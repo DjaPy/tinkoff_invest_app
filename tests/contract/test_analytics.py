@@ -1,26 +1,11 @@
-"""
-Contract tests for Analytics API endpoints (T016-T021)
-
-GET /api/v1/analytics/strategies/{strategy_id}/performance - Get strategy performance (T016)
-GET /api/v1/analytics/strategies/{strategy_id}/trades - Get trade analytics (T017)
-GET /api/v1/analytics/strategies/{strategy_id}/drawdown - Get drawdown analysis (T018)
-GET /api/v1/analytics/portfolio/summary - Get portfolio summary (T019)
-GET /api/v1/analytics/market-data/{instrument} - Get market data analytics (T020)
-POST /api/v1/analytics/backtest - Run backtest (T021)
-
-These tests validate the API contracts for analytics and performance metrics.
-They should FAIL until the actual endpoint implementations are complete.
-
-Following TDD approach - tests written before implementation.
-"""
-
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 from uuid import uuid4
 
 import pytest
 from starlette import status
 
-from algo_trading.ports.api.v1.schemas.analytics_schema import (
+from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
     DrawdownAnalysisResponseSchema,
     MarketDataAnalyticsResponseSchema,
     PortfolioSummaryResponseSchema,
@@ -39,6 +24,7 @@ async def test_get_strategy_performance_returns_metrics(
         create_trading_strategy,
         create_trading_sessions,
         create_order,
+        mock_auth,
 ):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance returns metrics"""
     strategy_id = uuid4()
@@ -79,7 +65,7 @@ async def test_get_strategy_performance_returns_metrics(
 
 @pytest.mark.parametrize('period', ['1d', '1w', '1m', '3m', '1y', 'all'])
 @pytest.mark.asyncio
-async def test_get_strategy_performance_with_period_filter(client, services, config, period):
+async def test_get_strategy_performance_with_period_filter(client, services, config, period, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports period filters"""
     strategy_id = uuid4()
 
@@ -94,7 +80,7 @@ async def test_get_strategy_performance_with_period_filter(client, services, con
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_performance_custom_date_range(client, config, services):
+async def test_get_strategy_performance_custom_date_range(client, config, services, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports custom date range"""
 
     strategy_id = uuid4()
@@ -114,7 +100,7 @@ async def test_get_strategy_performance_custom_date_range(client, config, servic
 
 
 @pytest.mark.asyncio
-async def test_get_strategy_performance_not_found(client, config, services, get_session):
+async def test_get_strategy_performance_not_found(client, config, services, get_session, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance returns 404"""
     non_existent_id = uuid4()
 
@@ -135,6 +121,7 @@ async def test_get_strategy_trades_analytics(
     create_trading_strategy,
     create_trading_sessions,
     create_order,
+    mock_auth,
 ):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/trades returns trade analytics"""
     strategy_id = uuid4()
@@ -178,6 +165,7 @@ async def test_get_strategy_drawdown_analysis(
     create_trading_strategy,
     create_trading_sessions,
     create_order,
+    mock_auth,
 ):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/drawdown returns drawdown analysis"""
     strategy_id = uuid4()
@@ -224,6 +212,7 @@ async def test_get_portfolio_summary(
     create_trading_strategy,
     create_trading_sessions,
     create_order,
+    mock_auth,
 ):
     """Test GET /api/v1/analytics/portfolio/summary returns portfolio summary"""
 
@@ -264,9 +253,25 @@ async def test_get_portfolio_summary(
 
 
 @pytest.mark.asyncio
-async def test_get_market_data_analytics(client, config):
+async def test_get_market_data_analytics(client, config, mock_auth, mock_tinkoff_client, monkeypatch):
     """Test GET /api/v1/analytics/market-data/{instrument} returns market data"""
+
     instrument = 'AAPL'
+    mock_tinkoff_client.set_instrument(instrument, {
+        'figi': 'BBG000B9XRY4',
+        'ticker': instrument,
+        'name': 'Apple Inc.',
+        'currency': 'usd',
+        'lot': 1,
+        'min_price_increment': Decimal('0.01'),
+    })
+    mock_tinkoff_client.set_price('BBG000B9XRY4', Decimal('150.25'))
+
+    # Monkeypatch TinkoffInvestClient to return our mock
+    monkeypatch.setattr(
+        'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
+        lambda account_id="test", context_name="up": mock_tinkoff_client,
+    )
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/{instrument}',
@@ -279,28 +284,45 @@ async def test_get_market_data_analytics(client, config):
         assert market_data.instrument == instrument
         assert market_data.timeframe is not None
         assert isinstance(market_data.data_points, list)
+        assert len(market_data.data_points) > 0
         assert isinstance(market_data.indicators, dict)
 
 
 @pytest.mark.parametrize('timeframe', ['1m', '5m', '15m', '1h', '1d'])
 @pytest.mark.asyncio
-async def test_get_market_data_with_timeframe(client, config, timeframe):
+async def test_get_market_data_with_timeframe(client, config, timeframe, mock_auth, mock_tinkoff_client, monkeypatch):
     """Test GET /api/v1/analytics/market-data/{instrument} supports timeframe parameter"""
     instrument = 'MSFT'
+
+    mock_tinkoff_client.set_instrument(instrument, {
+        'figi': 'BBG000BPH459',
+        'ticker': instrument,
+        'name': 'Microsoft Corp.',
+        'currency': 'usd',
+        'lot': 1,
+        'min_price_increment': Decimal('0.01'),
+    })
+    mock_tinkoff_client.set_price('BBG000BPH459', Decimal('380.50'))
+
+    monkeypatch.setattr(
+        'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
+        lambda account_id=None, context_name=None: mock_tinkoff_client,
+    )
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/{instrument}?timeframe={timeframe}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        if response.status == status.HTTP_200_OK:
-            data = await response.json()
-            market_data = MarketDataAnalyticsResponseSchema(**data)
-            assert market_data.timeframe == timeframe
+        assert response.status == status.HTTP_200_OK
+        data = await response.json()
+        market_data = MarketDataAnalyticsResponseSchema(**data)
+        assert market_data.timeframe == timeframe
+        assert len(market_data.data_points) > 0
 
 
 
 @pytest.mark.asyncio
-async def test_analytics_endpoints_require_authentication(client, config, get_session):
+async def test_analytics_endpoints_require_authentication(client, config, get_session, services):
     """Test all analytics endpoints require authentication"""
     strategy_id = uuid4()
 
@@ -317,6 +339,7 @@ async def test_analytics_endpoints_require_authentication(client, config, get_se
             url=f'http://127.0.0.1:{config.http.port}{endpoint}',
             headers={'Content-Type': 'application/json'},
         ) as response:
+            assert response.status != status.HTTP_401_UNAUTHORIZED
             assert response.status == status.HTTP_401_UNAUTHORIZED
             data = await response.json()
             assert data['status'] == 401

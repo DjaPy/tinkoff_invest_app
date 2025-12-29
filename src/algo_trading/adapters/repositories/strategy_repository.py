@@ -3,6 +3,7 @@
 Data access layer for TradingStrategy model.
 """
 
+from typing import Any
 from uuid import UUID
 
 from src.algo_trading.adapters.models import StrategyStatusEnum, TradingStrategyDocument
@@ -62,7 +63,7 @@ class StrategyRepository:
 
     @staticmethod
     async def find_all(
-        created_by: str | None = None,
+        created_by: UUID | None = None,
         status: StrategyStatusEnum | None = None,
         limit: int = 100,
         offset: int = 0,
@@ -79,7 +80,7 @@ class StrategyRepository:
         Returns:
             List of strategies
         """
-        query = {}
+        query: dict[str, Any] = {}
 
         if created_by:
             query['created_by'] = created_by
@@ -125,7 +126,7 @@ class StrategyRepository:
         return True
 
     @staticmethod
-    async def count(created_by: str | None = None, status: StrategyStatusEnum | None = None) -> int:
+    async def count(created_by: UUID | None = None, status: StrategyStatusEnum | None = None) -> int:
         """
         Count strategies matching filters.
 
@@ -136,7 +137,7 @@ class StrategyRepository:
         Returns:
             Count of matching strategies
         """
-        query = {}
+        query: dict[str, Any] = {}
 
         if created_by:
             query['created_by'] = created_by
@@ -147,7 +148,7 @@ class StrategyRepository:
         return await TradingStrategyDocument.find(query).count()
 
     @staticmethod
-    async def find_active_strategies(created_by: None | str = None) -> list[TradingStrategyDocument]:
+    async def find_active_strategies(created_by: UUID | None = None) -> list[TradingStrategyDocument]:
         """
         Find all active strategies.
 

@@ -1,4 +1,4 @@
 __all__ = ['FastAPIService', 'FastAPISettings']
 
-from .config import FastAPISettings
-from .service import FastAPIService
+from src.base.fastapi_service.config import FastAPISettings
+from src.base.fastapi_service.service import FastAPIService

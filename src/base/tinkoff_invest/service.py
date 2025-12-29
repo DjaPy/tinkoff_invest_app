@@ -1,6 +1,6 @@
 from aiomisc import Service
-from tinkoff.invest import AsyncClient
-from tinkoff.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
+from t_tech.invest import AsyncClient
+from t_tech.invest.constants import INVEST_GRPC_API, INVEST_GRPC_API_SANDBOX
 
 from src.base.tinkoff_invest.config import TinkoffInvestSettings
 
