@@ -6,7 +6,7 @@ Follows aiomisc Service pattern for integration with application lifecycle.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from aiomisc.service.periodic import PeriodicService
 
@@ -64,7 +64,7 @@ class ScheduledMetricsService(PeriodicService):
     async def _calculate_metrics_for_all_strategies(self) -> None:
         """Calculate metrics for all active strategies."""
         # Calculate for yesterday (full day)
-        period_end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        period_end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         period_start = period_end - timedelta(days=1)
 
         # Find all active or deployed strategies

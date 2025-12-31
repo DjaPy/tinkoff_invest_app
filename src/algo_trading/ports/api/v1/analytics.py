@@ -11,7 +11,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from config import config
+from src.consts import TINKOFF_INVEST_SANDBOX
+from src.config import config
 from src.base.fastapi_service.problem import (
     InternalServerError,
     UnprocessableEntity,
@@ -29,7 +30,7 @@ from src.algo_trading.services.market_data import MarketDataService, MarketDataE
 from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
 from src.algo_trading.ports.api.v1.schemas.analytics_schema import (
     BacktestRequestSchema,
-    BacktestResultsSchema,
+    BacktestResponseSchema,
     calculate_period_dates,
     check_period,
     DrawdownAnalysisResponseSchema,
@@ -334,7 +335,7 @@ async def get_market_data(
     """
     tinkoff_client = TinkoffInvestClient(
         account_id=config.tinkoff_invest.account,
-        context_name=config.tinkoff_invest.sandbox_token,
+        context_name=TINKOFF_INVEST_SANDBOX,
     )
     market_data_service = MarketDataService(tinkoff_client)
 
@@ -357,17 +358,17 @@ async def get_market_data(
 
 @analytics_router.post(
     '/backtest',
-    response_model=BacktestResultsSchema,
+    response_model=BacktestResponseSchema,
     summary='Run strategy backtest',
     responses={
-        status.HTTP_200_OK: {'model': BacktestResultsSchema},
+        status.HTTP_200_OK: {'model': BacktestResponseSchema},
         status.HTTP_400_BAD_REQUEST: {'model': ValidationErrorSchema},
         status.HTTP_422_UNPROCESSABLE_CONTENT: {'model': UnprocessableEntity},
         status.HTTP_500_INTERNAL_SERVER_ERROR: {'model': InternalServerError},
     },
     description='Run historical backtest for a trading strategy configuration',
 )
-async def run_backtest(request: BacktestRequestSchema) -> BacktestResultsSchema:
+async def run_backtest(request: BacktestRequestSchema) -> BacktestResponseSchema:
     """
     Run strategy backtest.
 
@@ -385,7 +386,7 @@ async def run_backtest(request: BacktestRequestSchema) -> BacktestResultsSchema:
 
     engine = BacktestEngine()
 
-    config = BacktestConfig(
+    backtest_config = BacktestConfig(
         strategy_type=request.strategy_type.value,
         parameters=request.parameters,
         instruments=request.instruments,
@@ -394,11 +395,11 @@ async def run_backtest(request: BacktestRequestSchema) -> BacktestResultsSchema:
         starting_capital=request.initial_capital,
         commission_rate=Decimal('0.001'),
     )
-    result = await engine.run_backtest(config)
+    result = await engine.run_backtest(backtest_config)
 
     final_capital = result.config.starting_capital * (Decimal('1') + result.performance.total_return)
 
-    return BacktestResultsSchema(
+    return BacktestResponseSchema(
         strategy_type=result.config.strategy_type,
         start_date=result.config.period_start,
         end_date=result.config.period_end,

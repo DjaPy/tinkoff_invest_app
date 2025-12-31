@@ -13,8 +13,8 @@ import pytest
 from starlette import status
 
 
-@pytest.mark.asyncio
-async def test_delete_strategy_removes_existing_strategy(client, config):
+
+async def test_delete_strategy_removes_existing_strategy(client, config, services, mock_auth):
     """Test DELETE /api/v1/strategies/{strategy_id} successfully deletes a strategy"""
     strategy_id = uuid4()
 
@@ -29,8 +29,8 @@ async def test_delete_strategy_removes_existing_strategy(client, config):
         assert content == '' or content is None
 
 
-@pytest.mark.asyncio
-async def test_delete_strategy_not_found(client, config):
+
+async def test_delete_strategy_not_found(client, config, services, mock_auth):
     """Test DELETE /api/v1/strategies/{strategy_id} returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -47,8 +47,8 @@ async def test_delete_strategy_not_found(client, config):
         assert data['status'] == 404
 
 
-@pytest.mark.asyncio
-async def test_delete_strategy_unauthorized_without_token(client, config):
+
+async def test_delete_strategy_unauthorized_without_token(client, config, services):
     """Test DELETE /api/v1/strategies/{strategy_id} requires authentication (401)"""
     strategy_id = uuid4()
 
@@ -63,7 +63,7 @@ async def test_delete_strategy_unauthorized_without_token(client, config):
         assert data['title'] == 'Unauthorized'
 
 
-@pytest.mark.asyncio
+
 async def test_delete_active_strategy_returns_conflict(client, config):
     """Test DELETE /api/v1/strategies/{strategy_id} returns 409 for active strategy"""
     # Per OpenAPI spec: Cannot delete active strategy
@@ -85,8 +85,8 @@ async def test_delete_active_strategy_returns_conflict(client, config):
             assert 'active' in data.get('detail', '').lower() or 'cannot delete' in data.get('detail', '').lower()
 
 
-@pytest.mark.asyncio
-async def test_delete_strategy_idempotent(client, config):
+
+async def test_delete_strategy_idempotent(client, config, services, mock_auth):
     """Test DELETE /api/v1/strategies/{strategy_id} is idempotent (deleting twice)"""
     strategy_id = uuid4()
 
@@ -106,7 +106,7 @@ async def test_delete_strategy_idempotent(client, config):
         assert response.status == status.HTTP_404_NOT_FOUND
 
 
-@pytest.mark.asyncio
+
 async def test_delete_strategy_handles_internal_error(client, config):
     """Test DELETE /api/v1/strategies/{strategy_id} handles internal server errors (500)"""
     strategy_id = uuid4()
@@ -125,8 +125,8 @@ async def test_delete_strategy_handles_internal_error(client, config):
 
 
 @pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
-@pytest.mark.asyncio
-async def test_delete_strategy_invalid_uuid_format(client, config, invalid_id):
+
+async def test_delete_strategy_invalid_uuid_format(client, config, services, mock_auth, invalid_id):
     """Test DELETE /api/v1/strategies/{strategy_id} validates UUID format"""
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{invalid_id}',

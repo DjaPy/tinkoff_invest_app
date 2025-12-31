@@ -5,10 +5,9 @@ Validates market data integration and processing.
 
 from http import HTTPStatus
 
-import pytest
 
 
-@pytest.mark.asyncio
+
 async def test_market_data_retrieval(client, config):
     """
     Integration test for market data retrieval.
@@ -27,7 +26,7 @@ async def test_market_data_retrieval(client, config):
         assert 'data' in market_data or 'candles' in market_data or isinstance(market_data, list)
 
 
-@pytest.mark.asyncio
+
 async def test_market_data_for_multiple_instruments(client, config):
     """
     Test market data retrieval for multiple instruments.
@@ -44,7 +43,7 @@ async def test_market_data_for_multiple_instruments(client, config):
             assert response.status == HTTPStatus.OK
 
 
-@pytest.mark.asyncio
+
 async def test_market_data_with_different_timeframes(client, config):
     """
     Test market data retrieval with different timeframes.
@@ -62,7 +61,7 @@ async def test_market_data_with_different_timeframes(client, config):
             assert response.status in [HTTPStatus.OK, HTTPStatus.BAD_REQUEST]
 
 
-@pytest.mark.asyncio
+
 async def test_market_data_validation(client, config):
     """
     Test market data request validation.
@@ -78,7 +77,7 @@ async def test_market_data_validation(client, config):
         assert response.status in [HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY]
 
 
-@pytest.mark.asyncio
+
 async def test_market_data_integration_with_strategy(client, config, mongo_connection):
     """
     Test market data integration with strategy execution.

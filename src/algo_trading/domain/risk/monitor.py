@@ -5,7 +5,7 @@ Continuously monitors trading activity and enforces risk limits in real-time.
 
 import logging
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -62,7 +62,7 @@ class RiskMonitor:
             strategy_id: Strategy to monitor
         """
         self._monitoring_enabled[strategy_id] = True
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         self._violation_count[strategy_id] = 0
 
     def disable_monitoring(self, strategy_id: UUID) -> None:
@@ -119,7 +119,7 @@ class RiskMonitor:
             violations.append(violation)
             await self._handle_violation(strategy_id, violation)
 
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         return violations
 
     async def check_portfolio_risk(
@@ -155,7 +155,7 @@ class RiskMonitor:
             violations.append(violation)
             await self._handle_violation(strategy_id, violation)
 
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         return violations
 
     async def check_drawdown_risk(
@@ -191,7 +191,7 @@ class RiskMonitor:
             violations.append(violation)
             await self._handle_violation(strategy_id, violation)
 
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         return violations
 
     async def check_daily_loss_risk(
@@ -227,7 +227,7 @@ class RiskMonitor:
             violations.append(violation)
             await self._handle_violation(strategy_id, violation)
 
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         return violations
 
     async def check_order_rate_risk(
@@ -263,7 +263,7 @@ class RiskMonitor:
             violations.append(violation)
             await self._handle_violation(strategy_id, violation)
 
-        self._last_check[strategy_id] = datetime.utcnow()
+        self._last_check[strategy_id] = datetime.now(timezone.utc)
         return violations
 
     async def check_all_risks(

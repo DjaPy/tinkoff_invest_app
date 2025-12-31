@@ -1,6 +1,6 @@
 """TradeOrder Beanie model - Hexagonal Architecture Adapter."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -65,12 +65,12 @@ class TradeOrderDocument(Document):
         Check if status transition is valid.
 
         Valid transitions:
-        - PENDING → SUBMITTED
+        - PENDING → SUBMITTED, CANCELLED, REJECTED
         - SUBMITTED → FILLED, PARTIALLY_FILLED, CANCELLED, REJECTED
         - PARTIALLY_FILLED → FILLED, CANCELLED
         """
         valid_transitions = {
-            OrderStatusEnum.PENDING: {OrderStatusEnum.SUBMITTED},
+            OrderStatusEnum.PENDING: {OrderStatusEnum.SUBMITTED, OrderStatusEnum.CANCELLED, OrderStatusEnum.REJECTED},
             OrderStatusEnum.SUBMITTED: {
                 OrderStatusEnum.FILLED,
                 OrderStatusEnum.PARTIALLY_FILLED,
@@ -113,9 +113,8 @@ class TradeOrderDocument(Document):
         if external_order_id is not None:
             self.external_order_id = external_order_id
 
-        # Mark as filled
         if new_status in {OrderStatusEnum.FILLED, OrderStatusEnum.CANCELLED, OrderStatusEnum.REJECTED}:
-            self.filled_at = datetime.utcnow()
+            self.filled_at = datetime.now(timezone.utc)
             self._immutable = True  # Immutable after final status
 
     def calculate_total_value(self) -> Decimal:

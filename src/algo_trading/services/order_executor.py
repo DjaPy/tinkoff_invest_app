@@ -206,8 +206,7 @@ class OrderExecutor:
             order.update_status(OrderStatusEnum.CANCELLED)
             await order.save()
 
-            # Update session
-            session = await TradingSessionDocument.get(order.session_id)
+            session = await TradingSessionDocument.find_one({'session_id': order.session_id})
             if session:
                 session.record_order('cancelled')
                 await session.save()

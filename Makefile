@@ -59,7 +59,7 @@ shell: ## poetry shell
 
 .PHONY: ruff
 ruff: ## ruff
-	poetry run ruff check ./$(NAME) ./tests
+	poetry run ruff check ./$(NAME) ./tests --fix
 
 .PHONY: pip-audit
 pip-audit: # checks your installed dependencies for known security vulnerabilities

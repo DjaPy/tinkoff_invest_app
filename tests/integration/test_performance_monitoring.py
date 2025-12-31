@@ -6,10 +6,9 @@ historical results.
 
 from http import HTTPStatus
 
-import pytest
 
 
-@pytest.mark.asyncio
+
 async def test_performance_monitoring_and_analytics(client, config, mongo_connection):
     """
     Integration test for performance monitoring workflow.
@@ -104,7 +103,7 @@ async def test_performance_monitoring_and_analytics(client, config, mongo_connec
         assert 'total_value' in summary or 'portfolio' in summary or 'summary' in summary
 
 
-@pytest.mark.asyncio
+
 async def test_performance_metrics_for_inactive_strategy(client, config, mongo_connection):
     """
     Test performance metrics for strategy that hasn't executed any trades.

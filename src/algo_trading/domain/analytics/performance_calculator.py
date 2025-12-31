@@ -240,8 +240,9 @@ class PerformanceCalculator:
         annualized_return = PerformanceCalculator.calculate_annualized_return(total_return, days)
 
         volatility = PerformanceCalculator.calculate_volatility(returns)
-        pre_average_return = Decimal(sum((r for r in returns), Decimal('0'))) / Decimal(len(returns))
-        average_return = pre_average_return if returns else Decimal('0')
+        average_return = (
+            Decimal(sum((r for r in returns), Decimal('0'))) / Decimal(len(returns)) if returns else Decimal('0')
+        )
         sharpe_ratio = PerformanceCalculator.calculate_sharpe_ratio(average_return, volatility)
 
         max_drawdown = PerformanceCalculator.calculate_max_drawdown(equity_curve)

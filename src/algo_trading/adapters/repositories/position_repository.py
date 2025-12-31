@@ -4,7 +4,7 @@ Position Repository - Hexagonal Architecture Adapter.
 Provides data access operations for portfolio positions with real-time updates.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -52,7 +52,7 @@ class PositionRepository:
             existing.quantity = Decimal(str(quantity))
             existing.average_price = average_price
             existing.current_price = current_price
-            existing.updated_at = datetime.utcnow()
+            existing.updated_at = datetime.now(timezone.utc)
             await existing.save()
             return existing
         # Create new position
@@ -139,7 +139,7 @@ class PositionRepository:
             raise ValueError(f'Position {position_id} not found')
 
         position.current_price = new_price
-        position.updated_at = datetime.utcnow()
+        position.updated_at = datetime.now(timezone.utc)
 
         await position.save()
         return position
@@ -168,7 +168,7 @@ class PositionRepository:
 
             for position in positions:
                 position.current_price = new_price
-                position.updated_at = datetime.utcnow()
+                position.updated_at = datetime.now(timezone.utc)
                 await position.save()
                 updated_positions.append(position)
 
@@ -222,7 +222,7 @@ class PositionRepository:
             )
             position.quantity = Decimal(str(new_quantity))
 
-        position.updated_at = datetime.utcnow()
+        position.updated_at = datetime.now(timezone.utc)
         await position.save()
         return position
 
@@ -252,7 +252,7 @@ class PositionRepository:
         position.realized_pnl += final_pnl
         position.quantity = Decimal('0')
         position.current_price = exit_price
-        position.updated_at = datetime.utcnow()
+        position.updated_at = datetime.now(timezone.utc)
 
         await position.save()
         return position

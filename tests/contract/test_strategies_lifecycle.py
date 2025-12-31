@@ -22,7 +22,7 @@ from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, Tradin
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_activates_inactive_strategy(client, config):
+async def test_start_strategy_activates_inactive_strategy(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start activates a strategy"""
     strategy_id = uuid4()
 
@@ -44,7 +44,7 @@ async def test_start_strategy_activates_inactive_strategy(client, config):
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_not_found(client, config):
+async def test_start_strategy_not_found(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -60,7 +60,7 @@ async def test_start_strategy_not_found(client, config):
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_conflict_invalid_state(client, config):
+async def test_start_strategy_conflict_invalid_state(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start returns 409 for invalid state transition"""
     # Per OpenAPI spec: Strategy cannot be started if in invalid state
     strategy_id = uuid4()
@@ -79,7 +79,7 @@ async def test_start_strategy_conflict_invalid_state(client, config):
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_unauthorized(client, config):
+async def test_start_strategy_unauthorized(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start requires authentication"""
     strategy_id = uuid4()
 
@@ -118,7 +118,7 @@ async def test_stop_strategy_halts_active_strategy(client, config):
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_closes_positions(client, config):
+async def test_stop_strategy_closes_positions(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/stop closes all open positions"""
     # Per OpenAPI spec description: "Halt a trading strategy and close all open positions"
     strategy_id = uuid4()
@@ -136,7 +136,7 @@ async def test_stop_strategy_closes_positions(client, config):
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_not_found(client, config):
+async def test_stop_strategy_not_found(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/stop returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -150,7 +150,7 @@ async def test_stop_strategy_not_found(client, config):
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_unauthorized(client, config):
+async def test_stop_strategy_unauthorized(client, config, services):
     """Test POST /api/v1/strategies/{strategy_id}/stop requires authentication"""
     strategy_id = uuid4()
 
@@ -167,7 +167,7 @@ async def test_stop_strategy_unauthorized(client, config):
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_temporarily_halts_execution(client, config):
+async def test_pause_strategy_temporarily_halts_execution(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/pause temporarily halts strategy"""
     strategy_id = uuid4()
 
@@ -189,7 +189,7 @@ async def test_pause_strategy_temporarily_halts_execution(client, config):
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_keeps_positions_open(client, config):
+async def test_pause_strategy_keeps_positions_open(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/pause keeps positions open"""
     # Per OpenAPI spec description: "Temporarily halt strategy execution without closing positions"
     strategy_id = uuid4()
@@ -207,7 +207,7 @@ async def test_pause_strategy_keeps_positions_open(client, config):
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_not_found(client, config):
+async def test_pause_strategy_not_found(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/pause returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -221,7 +221,7 @@ async def test_pause_strategy_not_found(client, config):
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_unauthorized(client, config):
+async def test_pause_strategy_unauthorized(client, config, services, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/pause requires authentication"""
     strategy_id = uuid4()
 

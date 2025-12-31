@@ -5,12 +5,11 @@ Validates user story: Pause, resume, and stop trading strategies as needed.
 
 from http import HTTPStatus
 
-import pytest
 
 from src.algo_trading.adapters.models import StrategyStatusEnum
 
 
-@pytest.mark.asyncio
+
 async def test_complete_strategy_lifecycle(client, config, mongo_connection):
     """
     Integration test for complete strategy lifecycle workflow.
@@ -110,7 +109,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         assert final['status'] == StrategyStatusEnum.STOPPED.value
 
 
-@pytest.mark.asyncio
+
 async def test_invalid_state_transitions(client, config, mongo_connection):
     """
     Test that invalid state transitions are rejected.
@@ -158,7 +157,7 @@ async def test_invalid_state_transitions(client, config, mongo_connection):
         assert response.status in [HTTPStatus.CONFLICT, HTTPStatus.BAD_REQUEST]
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_deletion(client, config, mongo_connection):
     """
     Test strategy deletion workflow.

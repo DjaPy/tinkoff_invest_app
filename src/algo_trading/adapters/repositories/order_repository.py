@@ -4,7 +4,7 @@ Order Repository - Hexagonal Architecture Adapter.
 Provides data access operations for trade orders with audit trail.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any
 from uuid import UUID
@@ -187,15 +187,15 @@ class OrderRepository:
                 order.filled_quantity = Decimal(str(filled_quantity))
             if filled_price is not None:
                 order.filled_price = filled_price
-            order.filled_at = datetime.utcnow()
+            order.filled_at = datetime.now(timezone.utc)
 
         if new_status == OrderStatusEnum.REJECTED and rejection_reason:
             order.rejection_reason = rejection_reason
 
         if new_status == OrderStatusEnum.CANCELLED:
-            order.cancelled_at = datetime.utcnow()
+            order.cancelled_at = datetime.now(timezone.utc)
 
-        order.updated_at = datetime.utcnow()
+        order.updated_at = datetime.now(timezone.utc)
 
         await order.save()
         return order
@@ -284,3 +284,45 @@ class OrderRepository:
             query_filter['status'] = status
 
         return await TradeOrderDocument.find(query_filter).count()
+
+    async def find_with_filters(
+        self,
+        strategy_id: UUID | None = None,
+        status: OrderStatusEnum | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[list[TradeOrderDocument], int]:
+        """
+        Find orders with flexible filtering and pagination.
+
+        Args:
+            strategy_id: Optional filter by strategy
+            status: Optional filter by order status
+            from_date: Optional filter by start date
+            to_date: Optional filter by end date
+            limit: Maximum number of orders to return
+            offset: Number of orders to skip
+
+        Returns:
+            Tuple of (orders list, total count)
+        """
+        query = TradeOrderDocument.find()
+
+        if strategy_id:
+            query = query.find(TradeOrderDocument.strategy_id == strategy_id)
+
+        if status:
+            query = query.find(TradeOrderDocument.status == status)
+
+        if from_date:
+            query = query.find(TradeOrderDocument.submitted_at >= from_date)
+
+        if to_date:
+            query = query.find(TradeOrderDocument.submitted_at <= to_date)
+
+        total = await query.count()
+        orders = await query.sort('-created_at').skip(offset).limit(limit).to_list()
+
+        return orders, total

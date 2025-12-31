@@ -6,12 +6,11 @@ respecting risk limits.
 
 from http import HTTPStatus
 
-import pytest
 
 from src.algo_trading.adapters.models import StrategyStatusEnum
 
 
-@pytest.mark.asyncio
+
 async def test_real_time_strategy_execution_and_risk_management(client, config, mongo_connection):
     """
     Integration test for real-time strategy execution workflow.
@@ -99,7 +98,7 @@ async def test_real_time_strategy_execution_and_risk_management(client, config, 
         assert 'positions' in positions_data or isinstance(positions_data, list)
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_respects_risk_limits(client, config, mongo_connection):
     """
     Test that strategy enforces risk control limits.
@@ -160,7 +159,7 @@ async def test_strategy_respects_risk_limits(client, config, mongo_connection):
         assert strategy['risk_controls']['enabled'] is True
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_execution_monitoring_endpoints(client, config, mongo_connection):
     """
     Test all monitoring endpoints work correctly during strategy execution.
@@ -219,7 +218,7 @@ async def test_strategy_execution_monitoring_endpoints(client, config, mongo_con
             assert response.status == HTTPStatus.OK, f'Endpoint {endpoint} failed'
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_execution_with_disabled_risk_controls(client, config, mongo_connection):
     """
     Test strategy execution with risk controls disabled.

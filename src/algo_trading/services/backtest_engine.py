@@ -91,7 +91,7 @@ class BacktestEngine:
             days=days,
         )
 
-        end_time = datetime.utcnow()
+        end_time = datetime.now(timezone.utc)
         execution_time_ms = (end_time - start_time).total_seconds() * 1000
 
         return BacktestResult(

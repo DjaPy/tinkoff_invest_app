@@ -32,7 +32,7 @@ class PositionListResponse(BaseModel):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_returns_position_list(client, config):
+async def test_get_positions_returns_position_list(client, config, services, mock_auth):
     """Test GET /api/v1/positions returns list of positions"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -53,7 +53,7 @@ async def test_get_positions_returns_position_list(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_validates_position_structure(client, config):
+async def test_get_positions_validates_position_structure(client, config, services, mock_auth):
     """Test GET /api/v1/positions returns positions with correct Pydantic structure"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -81,7 +81,7 @@ async def test_get_positions_validates_position_structure(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_empty_list(client, config, mongo_connection):
+async def test_get_positions_empty_list(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions returns empty list when no positions"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -98,7 +98,7 @@ async def test_get_positions_empty_list(client, config, mongo_connection):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_filter_by_strategy_id(client, config):
+async def test_get_positions_filter_by_strategy_id(client, config, services, mock_auth):
     """Test GET /api/v1/positions can filter by strategy_id"""
     strategy_id = uuid4()
 
@@ -116,7 +116,7 @@ async def test_get_positions_filter_by_strategy_id(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_filter_by_instrument(client, config):
+async def test_get_positions_filter_by_instrument(client, config, services, mock_auth):
     """Test GET /api/v1/positions can filter by instrument"""
     instrument = 'AAPL'
 
@@ -134,7 +134,7 @@ async def test_get_positions_filter_by_instrument(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_calculates_totals_correctly(client, config):
+async def test_get_positions_calculates_totals_correctly(client, config, services, mock_auth):
     """Test GET /api/v1/positions calculates total_value and total_pnl correctly"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -155,7 +155,7 @@ async def test_get_positions_calculates_totals_correctly(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_positions_unauthorized(client, config):
+async def test_get_positions_unauthorized(client, config, services, mock_auth):
     """Test GET /api/v1/positions requires authentication"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -166,11 +166,8 @@ async def test_get_positions_unauthorized(client, config):
         assert data['status'] == 401
 
 
-# ==================== GET /api/v1/positions/{position_id} TESTS ====================
-
-
 @pytest.mark.asyncio
-async def test_get_position_by_id_returns_position_details(client, config):
+async def test_get_position_by_id_returns_position_details(client, config, mock_auth):
     """Test GET /api/v1/positions/{position_id} returns position details"""
     position_id = uuid4()
 
@@ -195,7 +192,7 @@ async def test_get_position_by_id_returns_position_details(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_includes_computed_fields(client, config):
+async def test_get_position_by_id_includes_computed_fields(client, config, services, mock_auth):
     """Test GET /api/v1/positions/{position_id} includes computed fields"""
     position_id = uuid4()
 
@@ -221,7 +218,7 @@ async def test_get_position_by_id_includes_computed_fields(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_not_found(client, config):
+async def test_get_position_by_id_not_found(client, config, services, mock_auth):
     """Test GET /api/v1/positions/{position_id} returns 404 for non-existent position"""
     non_existent_id = uuid4()
 
@@ -235,7 +232,7 @@ async def test_get_position_by_id_not_found(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_unauthorized(client, config):
+async def test_get_position_by_id_unauthorized(client, config, services, mock_auth):
     """Test GET /api/v1/positions/{position_id} requires authentication"""
     position_id = uuid4()
 
@@ -250,7 +247,7 @@ async def test_get_position_by_id_unauthorized(client, config):
 
 @pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
 @pytest.mark.asyncio
-async def test_get_position_by_id_invalid_uuid_format(client, config, invalid_id):
+async def test_get_position_by_id_invalid_uuid_format(client, config, services, mock_auth, invalid_id):
     """Test GET /api/v1/positions/{position_id} validates UUID format"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{invalid_id}',

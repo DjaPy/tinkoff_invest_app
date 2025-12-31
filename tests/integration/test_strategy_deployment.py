@@ -6,12 +6,11 @@ that automatically execute trades based on predefined rules.
 
 from http import HTTPStatus
 
-import pytest
 
 from src.algo_trading.adapters.models import StrategyStatusEnum, StrategyTypeEnum
 
 
-@pytest.mark.asyncio
+
 async def test_create_and_deploy_trading_strategy(client, config, mongo_connection):
     """
     Integration test for complete strategy deployment workflow.
@@ -103,7 +102,7 @@ async def test_create_and_deploy_trading_strategy(client, config, mongo_connecti
         assert active_strategy['strategy_id'] == strategy_id
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_deployment_with_invalid_parameters(client, config):
     """
     Test strategy creation fails with invalid parameters.
@@ -139,7 +138,7 @@ async def test_strategy_deployment_with_invalid_parameters(client, config):
         assert response.status == HTTPStatus.UNPROCESSABLE_ENTITY
 
 
-@pytest.mark.asyncio
+
 async def test_strategy_deployment_with_invalid_risk_controls(client, config):
     """
     Test strategy creation fails with invalid risk controls.
@@ -179,7 +178,7 @@ async def test_strategy_deployment_with_invalid_risk_controls(client, config):
         assert 'detail' in error_data
 
 
-@pytest.mark.asyncio
+
 async def test_cannot_start_already_active_strategy(client, config, mongo_connection):
     """
     Test that starting an already active strategy fails appropriately.

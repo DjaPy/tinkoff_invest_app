@@ -9,11 +9,14 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
 
+from src.algo_trading.ports.api.v1.schemas.orders_schema import (
+    OrderListResponseSchema,
+    OrderResponseSchema,
+)
 from src.users.services.auth import get_current_active_user
 from src.algo_trading.enums import OrderStatusEnum
-from src.algo_trading.adapters.models.order import TradeOrderDocument
+from src.algo_trading.adapters.repositories.order_repository import OrderRepository
 from src.algo_trading.services.order_executor import OrderExecutor
 
 orders_router = APIRouter(
@@ -21,16 +24,6 @@ orders_router = APIRouter(
     tags=['Trade Orders'],
     dependencies=[Depends(get_current_active_user)],
 )
-
-
-
-class OrderListResponseSchema(BaseModel):
-    """Response schema for listing orders."""
-
-    orders: list[TradeOrderDocument] = Field(description='List of trade orders')
-    total: int = Field(ge=0, description='Total number of orders matching filters')
-    limit: int = Field(ge=1, le=100, description='Request limit parameter')
-    offset: int = Field(ge=0, description='Request offset parameter')
 
 
 @orders_router.get(
@@ -65,33 +58,28 @@ async def list_orders(
         HTTPException 422: Invalid query parameters
         HTTPException 500: Internal server error
     """
-    query = TradeOrderDocument.find()
+    repository = OrderRepository()
+    orders, total = await repository.find_with_filters(
+        strategy_id=strategy_id,
+        status=status_filter,
+        from_date=from_date,
+        to_date=to_date,
+        limit=limit,
+        offset=offset,
+    )
 
-    if strategy_id:
-        query = query.find(TradeOrderDocument.strategy_id == strategy_id)
+    resp_orders = [OrderResponseSchema(**order.model_dump())for order in orders]
 
-    if status_filter:
-        query = query.find(TradeOrderDocument.status == status_filter)
-
-    if from_date:
-        query = query.find(TradeOrderDocument.submitted_at >= from_date)
-
-    if to_date:
-        query = query.find(TradeOrderDocument.submitted_at <= to_date)
-
-    total = await query.count()
-    paginated_orders = await query.skip(offset).limit(limit).to_list()
-
-    return OrderListResponseSchema(orders=paginated_orders, total=total, limit=limit, offset=offset)
+    return OrderListResponseSchema(orders=resp_orders, total=total, limit=limit, offset=offset)
 
 
 @orders_router.get(
     '/{order_id}',
-    response_model=TradeOrderDocument,
+    response_model=OrderResponseSchema,
     summary='Get order details',
     description='Retrieve detailed information about a specific trade order',
 )
-async def get_order(order_id: UUID) -> TradeOrderDocument:
+async def get_order(order_id: UUID) -> OrderResponseSchema:
     """
     Get order by ID (T050).
 
@@ -105,7 +93,8 @@ async def get_order(order_id: UUID) -> TradeOrderDocument:
         HTTPException 404: Order not found
         HTTPException 500: Internal server error
     """
-    order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
+    repository = OrderRepository()
+    order = await repository.find_by_id(order_id)
 
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Order {order_id} not found')
@@ -115,11 +104,11 @@ async def get_order(order_id: UUID) -> TradeOrderDocument:
 
 @orders_router.post(
     '/{order_id}/cancel',
-    response_model=TradeOrderDocument,
+    response_model=OrderResponseSchema,
     summary='Cancel trade order',
     description='Cancel a pending or submitted trade order',
 )
-async def cancel_order(order_id: UUID) -> TradeOrderDocument:
+async def cancel_order(order_id: UUID) -> OrderResponseSchema:
     """
     Cancel a trade order (T051).
 
@@ -134,21 +123,21 @@ async def cancel_order(order_id: UUID) -> TradeOrderDocument:
         HTTPException 409: Order cannot be cancelled (already filled or rejected)
         HTTPException 500: Internal server error
     """
-    order = await TradeOrderDocument.find_one(TradeOrderDocument.order_id == order_id)
+    repository = OrderRepository()
+    order = await repository.find_by_id(order_id)
 
     if not order:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Order {order_id} not found')
 
-    # Check if order can be cancelled
     if order.status in [OrderStatusEnum.FILLED, OrderStatusEnum.REJECTED, OrderStatusEnum.CANCELLED]:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f'Order cannot be cancelled. Current status: {order.status}',
         )
 
-    # Cancel order via OrderExecutor service
     executor = OrderExecutor()
     try:
-        return await executor.cancel_order(order_id)
+        cancelled_order = await executor.cancel_order(order_id)
+        return OrderResponseSchema(**cancelled_order.model_dump(exclude={'id'}))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e

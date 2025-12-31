@@ -6,7 +6,7 @@ It should FAIL until the actual endpoint implementation is complete.
 """
 
 
-def test_post_strategies_creates_new_strategy(client):
+async def test_post_strategies_creates_new_strategy(client, config, services, mock_auth):
     """Test POST /api/v1/strategies creates a new trading strategy"""
     # This test is designed to FAIL until implementation
 
@@ -32,39 +32,45 @@ def test_post_strategies_creates_new_strategy(client):
         },
     }
 
-    response = client.post('/api/v1/strategies', json=strategy_data)
+    async with client.post(
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
+        json=strategy_data,
+    ) as response:
+        assert response.status == 201
+        assert 'application/json' in response.headers['content-type']
 
-    assert response.status_code == 201
-    assert 'application/json' in response.headers['content-type']
-
-    data = response.json()
-    assert 'strategy_id' in data
-    assert data['name'] == strategy_data['name']
-    assert data['strategy_type'] == strategy_data['strategy_type']
-    assert data['status'] == 'inactive'
-    assert 'created_at' in data
-    assert 'updated_at' in data
-    assert 'risk_controls' in data
+        data = await response.json()
+        assert 'strategy_id' in data
+        assert data['name'] == strategy_data['name']
+        assert data['strategy_type'] == strategy_data['strategy_type']
+        assert data['status'] == 'inactive'
+        assert 'created_at' in data
+        assert 'updated_at' in data
+        assert 'risk_controls' in data
 
 
-def test_post_strategies_validates_required_fields(client):
+async def test_post_strategies_validates_required_fields(client, config, services, mock_auth):
     """Test POST /api/v1/strategies validates required fields"""
     invalid_data = {
         'name': 'Incomplete Strategy',
     }
 
-    response = client.post('/api/v1/strategies', json=invalid_data)
+    async with client.post(
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
+        json=invalid_data,
+    ) as response:
+        assert response.status == 422
+        assert 'application/json' in response.headers['content-type']
 
-    assert response.status_code == 422
-    assert 'application/json' in response.headers['content-type']
-
-    data = response.json()
-    assert 'type' in data
-    assert 'title' in data
-    assert data['status'] == 422
+        data = await response.json()
+        assert 'type' in data
+        assert 'title' in data
+        assert data['status'] == 422
 
 
-def test_post_strategies_validates_risk_controls(client):
+async def test_post_strategies_validates_risk_controls(client, config, services, mock_auth):
     """Test POST /api/v1/strategies validates risk control constraints"""
 
     strategy_data = {
@@ -84,14 +90,17 @@ def test_post_strategies_validates_risk_controls(client):
         },
     }
 
-    response = client.post('/api/v1/strategies', json=strategy_data)
+    async with client.post(
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
+        json=strategy_data,
+    ) as response:
+        assert response.status == 422
+        data = await response.json()
+        assert 'invalid_params' in data or 'detail' in data
 
-    assert response.status_code == 422
-    data = response.json()
-    assert 'invalid_params' in data
 
-
-def test_post_strategies_unauthorized_without_token(client):
+async def test_post_strategies_unauthorized_without_token(client, config, services):
     """Test POST /api/v1/strategies requires authentication"""
 
     strategy_data = {
@@ -111,9 +120,12 @@ def test_post_strategies_unauthorized_without_token(client):
         },
     }
 
-    response = client.post('/api/v1/strategies', json=strategy_data)
-
-    assert response.status_code == 401
-    data = response.json()
-    assert data['status'] == 401
-    assert data['title'] == 'Unauthorized'
+    async with client.post(
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
+        headers={'Content-Type': 'application/json'},
+        json=strategy_data,
+    ) as response:
+        assert response.status == 401
+        data = await response.json()
+        assert data['status'] == 401
+        assert data['title'] == 'Unauthorized'

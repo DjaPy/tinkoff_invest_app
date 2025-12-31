@@ -21,8 +21,8 @@ class StrategyListResponse(BaseModel):
     total: int = Field(ge=0, description='Total number of strategies')
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_returns_strategy_list(client, config):
+
+async def test_get_strategies_returns_strategy_list(client, config, services, mock_auth):
     """Test GET /api/v1/strategies returns list of strategies"""
     # This test is designed to FAIL until implementation
     async with client.get(
@@ -42,8 +42,14 @@ async def test_get_strategies_returns_strategy_list(client, config):
         assert response_model.total >= 0
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_validates_strategy_structure(client, config, pydantic_generator_data):
+
+async def test_get_strategies_validates_strategy_structure(
+    client,
+    config,
+    services,
+    mock_auth,
+    pydantic_generator_data,
+):
     """Test GET /api/v1/strategies returns strategies with correct Pydantic structure"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -81,8 +87,8 @@ async def test_get_strategies_validates_strategy_structure(client, config, pydan
                 assert strategy.created_by is not None
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection):
+
+async def test_get_strategies_empty_list_when_no_strategies(client, config, services, mock_auth, mongo_connection):
     """Test GET /api/v1/strategies returns empty list when no strategies"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -96,8 +102,8 @@ async def test_get_strategies_empty_list_when_no_strategies(client, config, mong
         assert response_model.strategies == []
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_unauthorized_without_token(client, config):
+
+async def test_get_strategies_unauthorized_without_token(client, config, services):
     """Test GET /api/v1/strategies requires authentication (401)"""
     # No Authorization header
     async with client.get(
@@ -113,8 +119,8 @@ async def test_get_strategies_unauthorized_without_token(client, config):
         assert data['status'] == 401
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_validates_pydantic_model(client, config, pydantic_generator_data):
+
+async def test_get_strategies_validates_pydantic_model(client, config, services, mock_auth, pydantic_generator_data):
     """Test GET /api/v1/strategies response validates against Pydantic model"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -132,8 +138,8 @@ async def test_get_strategies_validates_pydantic_model(client, config, pydantic_
             pytest.fail(f'Response validation failed: {e}')
 
 
-@pytest.mark.asyncio
-async def test_get_strategies_handles_internal_errors(client, config):
+
+async def test_get_strategies_handles_internal_errors(client, config, services, mock_auth):
     """Test GET /api/v1/strategies handles internal server errors (500)"""
     # This will test error handling when implemented
     async with client.get(

@@ -100,7 +100,7 @@ class BacktestRequestSchema(BaseModel):
     risk_controls: RiskControls = Field(description='Risk management parameters')
 
 
-class BacktestResultsSchema(BaseModel):
+class BacktestResponseSchema(BaseModel):
     """Response schema for backtest results."""
 
     strategy_type: str = Field(description='Strategy type tested')

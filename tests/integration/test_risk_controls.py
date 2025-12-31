@@ -5,10 +5,9 @@ Validates risk management framework integration.
 
 from http import HTTPStatus
 
-import pytest
 
 
-@pytest.mark.asyncio
+
 async def test_risk_controls_enforcement(client, config, mongo_connection):
     """
     Integration test for risk controls enforcement.
@@ -66,7 +65,7 @@ async def test_risk_controls_enforcement(client, config, mongo_connection):
         assert strategy['risk_controls']['max_position_size'] == '200'
 
 
-@pytest.mark.asyncio
+
 async def test_risk_controls_validation(client, config):
     """
     Test risk controls validation on strategy creation.
@@ -104,7 +103,7 @@ async def test_risk_controls_validation(client, config):
         assert response.status == HTTPStatus.UNPROCESSABLE_ENTITY
 
 
-@pytest.mark.asyncio
+
 async def test_update_risk_controls_on_running_strategy(client, config, mongo_connection):
     """
     Test updating risk controls on a running strategy.

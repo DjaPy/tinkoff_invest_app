@@ -1,6 +1,6 @@
 """TradingSession Beanie model - Hexagonal Architecture Adapter."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -24,19 +24,16 @@ class TradingSessionDocument(Document):
     session_start: datetime = Field(default_factory=datetime.utcnow, description='Session start')
     session_end: datetime | None = Field(None, description='Session end (None if active)')
 
-    # Session statistics
     orders_placed: int = Field(default=0, ge=0, description='Total orders placed in session')
     orders_filled: int = Field(default=0, ge=0, description='Orders successfully filled')
     orders_cancelled: int = Field(default=0, ge=0, description='Orders cancelled')
     orders_rejected: int = Field(default=0, ge=0, description='Orders rejected')
 
-    # Financial metrics
     total_commission: DecimalField = Field(default=Decimal('0'), ge=0, description='Total commissions paid')
     realized_pnl: DecimalField = Field(default=Decimal('0'), description='Realized profit/loss')
     starting_capital: DecimalField = Field(gt=0, description='Starting capital for session')
     ending_capital: DecimalField | None = Field(None, description='Ending capital (None if active)')
 
-    # Risk tracking
     max_drawdown_reached: DecimalField = Field(default=Decimal('0'), description='Maximum drawdown during session')
     risk_violations: int = Field(default=0, ge=0, description='Number of risk violations')
 
@@ -58,7 +55,6 @@ class TradingSessionDocument(Document):
         """Filled + cancelled + rejected cannot exceed total placed."""
         orders_placed = info.data.get('orders_placed', 0)
 
-        # Get all order counts
         orders_filled = info.data.get('orders_filled', 0)
         orders_cancelled = info.data.get('orders_cancelled', 0)
         orders_rejected = info.data.get('orders_rejected', 0)
@@ -89,7 +85,7 @@ class TradingSessionDocument(Document):
         if ending_capital <= 0:
             raise ValueError('Ending capital must be positive')
 
-        self.session_end = datetime.utcnow()
+        self.session_end = datetime.now(timezone.utc)
         self.ending_capital = ending_capital
         self.realized_pnl = ending_capital - self.starting_capital
 
@@ -128,6 +124,6 @@ class TradingSessionDocument(Document):
         name = 'trading_sessions'
         indexes = [
             'session_id',
-            [('strategy_id', 1), ('session_start', -1)],  # Latest sessions first
-            'session_end',  # Filter active sessions (NULL)
+            [('strategy_id', 1), ('session_start', -1)],
+            'session_end',
         ]

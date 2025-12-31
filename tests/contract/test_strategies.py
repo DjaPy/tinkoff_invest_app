@@ -12,7 +12,7 @@ from starlette import status
 from src.algo_trading.adapters.models.strategy import RiskControls, StrategyTypeEnum, TradingStrategyDocument
 
 
-async def test_get_strategies_returns_strategy_list(client, config):
+async def test_get_strategies_returns_strategy_list(client, config, services, mock_auth):
     """Test GET /api/v1/strategies returns list of strategies (T039)"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -63,7 +63,7 @@ async def test_get_strategies_validates_strategy_structure(client, config, mongo
     await strategy.delete()
 
 
-async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection):
+async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/strategies returns empty list (T041)"""
     # Ensure database is clean
     await TradingStrategyDocument.delete_all()
@@ -79,7 +79,7 @@ async def test_get_strategies_empty_list_when_no_strategies(client, config, mong
         assert data['strategies'] == []
 
 
-async def test_get_strategies_unauthorized_without_token(client, config):
+async def test_get_strategies_unauthorized_without_token(client, config, services, mock_auth):
     """Test GET /api/v1/strategies requires authentication (T042)"""
     async with client.get(url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies') as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
@@ -125,7 +125,7 @@ async def test_get_strategies_validates_pydantic_model(client, config, mongo_con
     await strategy.delete()
 
 
-async def test_get_strategies_handles_internal_errors(client, config):
+async def test_get_strategies_handles_internal_errors(client, config, services, mock_auth):
     """Test GET /api/v1/strategies handles internal errors gracefully (T044)"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',

@@ -1,6 +1,6 @@
 """PortfolioPosition Beanie model - Hexagonal Architecture Adapter."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -57,7 +57,7 @@ class PortfolioPositionDocument(Document):
             raise ValueError('Price must be positive')
 
         self.current_price = new_price
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     def add_trade(self, quantity: Decimal, price: Decimal) -> None:
         """
@@ -82,7 +82,7 @@ class PortfolioPositionDocument(Document):
             if self.quantity * quantity > 0:  # Position flipped
                 self.average_price = price
 
-        self.updated_at = datetime.utcnow()
+        self.updated_at = datetime.now(timezone.utc)
 
     class Settings:
         name = 'portfolio_positions'

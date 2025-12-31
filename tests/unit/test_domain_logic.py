@@ -10,7 +10,6 @@ These tests focus on pure domain logic without infrastructure dependencies.
 
 from decimal import Decimal
 
-import pytest
 
 from src.algo_trading.domain.analytics.performance_calculator import (
     PerformanceCalculator,
@@ -24,7 +23,7 @@ from src.algo_trading.domain.risk.risk_evaluator import (
 )
 
 
-@pytest.mark.asyncio
+
 async def test_risk_evaluator_approves_valid_order():
     """Test that risk evaluator approves orders within limits."""
     evaluator = RiskEvaluator()
@@ -58,7 +57,7 @@ async def test_risk_evaluator_approves_valid_order():
     assert result.approved is True
 
 
-@pytest.mark.asyncio
+
 async def test_risk_evaluator_rejects_position_limit_violation():
     """Test that risk evaluator rejects orders exceeding position limits."""
     evaluator = RiskEvaluator()
@@ -95,7 +94,7 @@ async def test_risk_evaluator_rejects_position_limit_violation():
 # ==================== PERFORMANCE CALCULATOR TESTS ====================
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_total_return():
     """Test total return calculation."""
     calculator = PerformanceCalculator()
@@ -117,7 +116,7 @@ async def test_calculate_total_return():
     assert total_loss == Decimal('-0.20')  # -20% return
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_max_drawdown():
     """Test maximum drawdown calculation."""
     calculator = PerformanceCalculator()
@@ -136,7 +135,7 @@ async def test_calculate_max_drawdown():
     assert max_dd < Decimal('0')  # Drawdown should be negative
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_max_drawdown_no_losses():
     """Test drawdown with increasing equity."""
     calculator = PerformanceCalculator()
@@ -153,7 +152,7 @@ async def test_calculate_max_drawdown_no_losses():
     assert max_dd == Decimal('0')
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_volatility():
     """Test volatility calculation."""
     calculator = PerformanceCalculator()
@@ -171,7 +170,7 @@ async def test_calculate_volatility():
     assert volatility > Decimal('0')
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_trade_statistics():
     """Test trade statistics calculation."""
     calculator = PerformanceCalculator()
@@ -195,7 +194,7 @@ async def test_calculate_trade_statistics():
     assert stats.avg_win == Decimal('150')
 
 
-@pytest.mark.asyncio
+
 async def test_calculate_sharpe_ratio():
     """Test Sharpe ratio calculation."""
     calculator = PerformanceCalculator()
@@ -217,7 +216,7 @@ async def test_calculate_sharpe_ratio():
 # ==================== DOMAIN MODEL TESTS ====================
 
 
-@pytest.mark.asyncio
+
 async def test_risk_limits_dataclass():
     """Test RiskLimits dataclass creation."""
     limits = RiskLimits(
@@ -233,7 +232,7 @@ async def test_risk_limits_dataclass():
     assert limits.stop_loss_percent == Decimal('0.05')
 
 
-@pytest.mark.asyncio
+
 async def test_position_risk_dataclass():
     """Test PositionRisk dataclass creation."""
     risk = PositionRisk(
@@ -248,7 +247,7 @@ async def test_position_risk_dataclass():
     assert risk.current_portfolio_value == Decimal('25000')
 
 
-@pytest.mark.asyncio
+
 async def test_trade_dataclass():
     """Test Trade dataclass creation."""
     trade = Trade(
@@ -260,7 +259,7 @@ async def test_trade_dataclass():
     assert trade.return_pct == Decimal('0.025')
 
 
-@pytest.mark.asyncio
+
 async def test_order_proposal_dataclass():
     """Test OrderProposal dataclass creation."""
     order = OrderProposal(

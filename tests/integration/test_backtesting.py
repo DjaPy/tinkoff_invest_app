@@ -6,10 +6,9 @@ live deployment.
 
 from http import HTTPStatus
 
-import pytest
 
 
-@pytest.mark.asyncio
+
 async def test_backtest_workflow(client, config, mongo_connection):
     """
     Integration test for backtesting workflow.
@@ -44,7 +43,7 @@ async def test_backtest_workflow(client, config, mongo_connection):
         assert 'sharpe_ratio' in backtest_results or 'metrics' in backtest_results
 
 
-@pytest.mark.asyncio
+
 async def test_backtest_with_different_strategy_types(client, config):
     """
     Test backtesting with different strategy types.
@@ -84,7 +83,7 @@ async def test_backtest_with_different_strategy_types(client, config):
             assert response.status == HTTPStatus.OK
 
 
-@pytest.mark.asyncio
+
 async def test_backtest_validation(client, config):
     """
     Test backtest request validation.

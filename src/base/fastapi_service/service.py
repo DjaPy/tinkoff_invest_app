@@ -73,7 +73,7 @@ class FastAPIService(Service):
             request: Request,
             exc: RequestValidationError,
     ) -> ProblemResponse:
-        status_ = HTTPStatus.BAD_REQUEST
+        status_ = HTTPStatus.UNPROCESSABLE_ENTITY
         problem = Problem(title=status_.phrase, status=status_, instance=request.url.path,
                           invalid_params=exc.errors())
         return ProblemResponse(content=problem)

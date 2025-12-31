@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import timezone, UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -15,7 +15,7 @@ from src.algo_trading.enums import OrderStatusEnum
 from src.algo_trading.adapters.models import TradingStrategyDocument
 from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
 
-@pytest.mark.asyncio
+
 async def test_get_strategy_performance_returns_metrics(
         config,
         services,
@@ -45,7 +45,7 @@ async def test_get_strategy_performance_returns_metrics(
             await create_order(
                 strategy_id=strategy.strategy_id,
                 session_id=session.session_id,
-                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                filled_at=session_start + timedelta(hours=2),
                 status=OrderStatusEnum.FILLED,
             )
 
@@ -64,7 +64,6 @@ async def test_get_strategy_performance_returns_metrics(
 
 
 @pytest.mark.parametrize('period', ['1d', '1w', '1m', '3m', '1y', 'all'])
-@pytest.mark.asyncio
 async def test_get_strategy_performance_with_period_filter(client, services, config, period, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports period filters"""
     strategy_id = uuid4()
@@ -79,7 +78,6 @@ async def test_get_strategy_performance_with_period_filter(client, services, con
             assert metrics.strategy_id == strategy_id
 
 
-@pytest.mark.asyncio
 async def test_get_strategy_performance_custom_date_range(client, config, services, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance supports custom date range"""
 
@@ -99,7 +97,6 @@ async def test_get_strategy_performance_custom_date_range(client, config, servic
             assert metrics.period_end.date() <= datetime.fromisoformat(to_date).date()
 
 
-@pytest.mark.asyncio
 async def test_get_strategy_performance_not_found(client, config, services, get_session, mock_auth):
     """Test GET /api/v1/analytics/strategies/{strategy_id}/performance returns 404"""
     non_existent_id = uuid4()
@@ -113,7 +110,6 @@ async def test_get_strategy_performance_not_found(client, config, services, get_
         assert data['status'] == 404
 
 
-@pytest.mark.asyncio
 async def test_get_strategy_trades_analytics(
     client,
     config,
@@ -157,7 +153,6 @@ async def test_get_strategy_trades_analytics(
         assert analytics.strategy_id == strategy_id
 
 
-@pytest.mark.asyncio
 async def test_get_strategy_drawdown_analysis(
     client,
     config,
@@ -204,7 +199,6 @@ async def test_get_strategy_drawdown_analysis(
         assert drawdown.current_drawdown <= 0
 
 
-@pytest.mark.asyncio
 async def test_get_portfolio_summary(
     client,
     config,
@@ -217,12 +211,13 @@ async def test_get_portfolio_summary(
     """Test GET /api/v1/analytics/portfolio/summary returns portfolio summary"""
 
     strategy_id = uuid4()
+    base_time = datetime.now(timezone.utc)
 
     strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
 
     for day_offset in range(35):
-        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
-        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+        session_start = base_time - timedelta(days=day_offset+1)
+        session_end = base_time - timedelta(days=day_offset)
 
         session = await create_trading_sessions(
             strategy_id=strategy.strategy_id,
@@ -234,7 +229,7 @@ async def test_get_portfolio_summary(
             await create_order(
                 strategy_id=strategy.strategy_id,
                 session_id=session.session_id,
-                filled_at=session_start + timedelta(hours=2),  # Orders filled 2 hours into session
+                filled_at=session_start + timedelta(hours=2),
                 status=OrderStatusEnum.FILLED,
             )
     async with client.get(
@@ -251,9 +246,14 @@ async def test_get_portfolio_summary(
         assert 0 <= summary.win_rate <= 1
 
 
-
-@pytest.mark.asyncio
-async def test_get_market_data_analytics(client, config, mock_auth, mock_tinkoff_client, monkeypatch):
+async def test_get_market_data_analytics(
+    client,
+    monkeypatch,
+    config,
+    mock_auth,
+    mock_tinkoff_client,
+    mongo_connection,
+):
     """Test GET /api/v1/analytics/market-data/{instrument} returns market data"""
 
     instrument = 'AAPL'
@@ -267,7 +267,6 @@ async def test_get_market_data_analytics(client, config, mock_auth, mock_tinkoff
     })
     mock_tinkoff_client.set_price('BBG000B9XRY4', Decimal('150.25'))
 
-    # Monkeypatch TinkoffInvestClient to return our mock
     monkeypatch.setattr(
         'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
         lambda account_id="test", context_name="up": mock_tinkoff_client,
@@ -289,8 +288,15 @@ async def test_get_market_data_analytics(client, config, mock_auth, mock_tinkoff
 
 
 @pytest.mark.parametrize('timeframe', ['1m', '5m', '15m', '1h', '1d'])
-@pytest.mark.asyncio
-async def test_get_market_data_with_timeframe(client, config, timeframe, mock_auth, mock_tinkoff_client, monkeypatch):
+async def test_get_market_data_with_timeframe(
+    client,
+    config,
+    timeframe,
+    mock_auth,
+    mock_tinkoff_client,
+    monkeypatch,
+    mongo_connection,
+):
     """Test GET /api/v1/analytics/market-data/{instrument} supports timeframe parameter"""
     instrument = 'MSFT'
 
@@ -320,8 +326,6 @@ async def test_get_market_data_with_timeframe(client, config, timeframe, mock_au
         assert len(market_data.data_points) > 0
 
 
-
-@pytest.mark.asyncio
 async def test_analytics_endpoints_require_authentication(client, config, get_session, services):
     """Test all analytics endpoints require authentication"""
     strategy_id = uuid4()
@@ -339,7 +343,6 @@ async def test_analytics_endpoints_require_authentication(client, config, get_se
             url=f'http://127.0.0.1:{config.http.port}{endpoint}',
             headers={'Content-Type': 'application/json'},
         ) as response:
-            assert response.status != status.HTTP_401_UNAUTHORIZED
             assert response.status == status.HTTP_401_UNAUTHORIZED
             data = await response.json()
             assert data['status'] == 401

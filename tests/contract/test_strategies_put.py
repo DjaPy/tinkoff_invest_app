@@ -25,8 +25,7 @@ class UpdateStrategyRequest(BaseModel):
     risk_controls: RiskControls | None = Field(None, description='Risk management configuration')
 
 
-@pytest.mark.asyncio
-async def test_put_strategy_updates_existing_strategy(client, config, pydantic_generator_data):
+async def test_put_strategy_updates_existing_strategy(client, config, services, mock_auth, pydantic_generator_data):
     """Test PUT /api/v1/strategies/{strategy_id} updates an existing strategy"""
     strategy_id = uuid4()
 
@@ -74,7 +73,7 @@ async def test_put_strategy_updates_existing_strategy(client, config, pydantic_g
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_partial_update(client, config):
+async def test_put_strategy_partial_update(client, config, services, mock_auth):
     """Test PUT /api/v1/strategies/{strategy_id} allows partial updates"""
     strategy_id = uuid4()
 
@@ -95,7 +94,7 @@ async def test_put_strategy_partial_update(client, config):
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_validates_risk_controls(client, config):
+async def test_put_strategy_validates_risk_controls(client, config, services, mock_auth):
     """Test PUT /api/v1/strategies/{strategy_id} validates risk control constraints"""
     strategy_id = uuid4()
 
@@ -128,7 +127,7 @@ async def test_put_strategy_validates_risk_controls(client, config):
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_not_found(client, config):
+async def test_put_strategy_not_found(client, config, services, mock_auth):
     """Test PUT /api/v1/strategies/{strategy_id} returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -149,12 +148,11 @@ async def test_put_strategy_not_found(client, config):
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_unauthorized_without_token(client, config):
+async def test_put_strategy_unauthorized_without_token(client, config, services):
     """Test PUT /api/v1/strategies/{strategy_id} requires authentication (401)"""
     strategy_id = uuid4()
     update_data = {'name': 'Unauthorized Update'}
 
-    # No Authorization header
     async with client.put(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Content-Type': 'application/json'},
@@ -167,7 +165,7 @@ async def test_put_strategy_unauthorized_without_token(client, config):
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_bad_request_invalid_data(client, config):
+async def test_put_strategy_bad_request_invalid_data(client, config, services, mock_auth):
     """Test PUT /api/v1/strategies/{strategy_id} returns 400 for invalid data"""
     strategy_id = uuid4()
 
@@ -190,7 +188,7 @@ async def test_put_strategy_bad_request_invalid_data(client, config):
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_updates_timestamp(client, config):
+async def test_put_strategy_updates_timestamp(client, config, services, mock_auth):
     """Test PUT /api/v1/strategies/{strategy_id} updates the updated_at timestamp"""
     strategy_id = uuid4()
     update_data = {'name': 'Timestamp Test Strategy'}

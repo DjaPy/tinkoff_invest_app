@@ -10,7 +10,7 @@ from decimal import Decimal
 from typing import Any
 from uuid import UUID
 
-from algo_trading.adapters.models import (
+from src.algo_trading.adapters.models import (
     ArbitrageParameters,
     MarketMakingParameters,
     MeanReversionParameters,

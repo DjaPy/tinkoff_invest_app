@@ -3,7 +3,7 @@
 Provides health and readiness checks for the application.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from src.algo_trading.adapters.models import TradingStrategyDocument
@@ -25,7 +25,7 @@ class HealthChecker:
         """
         return {
             'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'service': 'algo-trading',
         }
 
@@ -57,7 +57,7 @@ class HealthChecker:
 
         return {
             'status': 'ready' if all_healthy else 'not_ready',
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'checks': checks,
         }
 
@@ -109,7 +109,7 @@ class HealthChecker:
         return {
             'service': 'algo-trading',
             'version': '1.0.0',
-            'timestamp': datetime.utcnow().isoformat(),
+            'timestamp': datetime.now(timezone.utc).isoformat(),
             'statistics': {
                 'total_strategies': total_strategies,
                 'active_strategies': active_strategies,

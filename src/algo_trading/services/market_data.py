@@ -93,7 +93,6 @@ class MarketDataService:
             instrument = await self.client.get_instrument_by_ticker(ticker)
             figi = instrument['figi']
 
-            # Map timeframe to CandleInterval
             interval_map = {
                 '1m': CandleInterval.CANDLE_INTERVAL_1_MIN,
                 '5m': CandleInterval.CANDLE_INTERVAL_5_MIN,
@@ -120,9 +119,12 @@ class MarketDataService:
                 from_time = to_time - timedelta(days=limit)
 
             candles = await self.client.get_candles(figi=figi, interval=interval, from_time=from_time, to_time=to_time)
-            market_data_list = []
-            for candle in candles:
-                market_data = MarketDataDocument(
+
+            if not candles:
+                return []
+
+            market_data_list = [
+                MarketDataDocument(
                     instrument=ticker,
                     timeframe=timeframe,
                     timestamp=candle['time'],
@@ -132,8 +134,10 @@ class MarketDataService:
                     close_price=candle['close'],
                     volume=candle['volume'],
                 )
-                await market_data.insert()
-                market_data_list.append(market_data)
+                for candle in candles
+            ]
+
+            await MarketDataDocument.insert_many(market_data_list)
 
             return market_data_list
         except Exception as e:
@@ -155,10 +159,10 @@ class MarketDataService:
             MarketDataError: If data fetch fails
         """
         try:
-            # Query from database
             return (
                 await MarketDataDocument.find(
-                    MarketDataDocument.instrument == ticker, MarketDataDocument.timeframe == timeframe,
+                    MarketDataDocument.instrument == ticker,
+                    MarketDataDocument.timeframe == timeframe,
                 )
                 .sort('-timestamp')
                 .limit(limit)
@@ -216,6 +220,29 @@ class MarketDataService:
         except Exception as e:
             raise MarketDataError(f'Failed to refresh data for {ticker}: {e}') from e
 
+    async def cleanup_old_data(self, days_to_keep: int = 90) -> int:
+        """
+        Delete market data older than specified days.
+
+        Args:
+            days_to_keep: Number of days to keep (default: 90)
+
+        Returns:
+            Number of deleted documents
+
+        Raises:
+            MarketDataError: If cleanup fails
+        """
+        try:
+            cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_to_keep)
+
+            result = await MarketDataDocument.find(MarketDataDocument.timestamp < cutoff_date).delete()
+
+            return result.deleted_count if result else 0
+
+        except Exception as e:
+            raise MarketDataError(f'Failed to cleanup old data: {e}') from e
+
     async def get_market_data_analytics(
         self,
         ticker: str,
@@ -252,7 +279,7 @@ class MarketDataService:
             for md in market_data_list
         ]
 
-        last_updated = market_data_list[0].timestamp if market_data_list else datetime.utcnow()
+        last_updated = market_data_list[0].timestamp if market_data_list else datetime.now(timezone.utc)
 
         return {
             'instrument': ticker,
