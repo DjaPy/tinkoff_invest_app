@@ -1,7 +1,8 @@
 """TradingStrategy Beanie model - Hexagonal Architecture Adapter."""
 
-from datetime import datetime, UTC
+from datetime import datetime, timezone, UTC
 from decimal import Decimal
+from functools import partial
 from uuid import UUID, uuid4
 
 import pymongo
@@ -88,8 +89,8 @@ class TradingStrategyDocument(Document):
         description='Strategy-specific parameters',
     )
     risk_controls: RiskControls = Field(description='Risk management configuration')
-    created_at: datetime = Field(default_factory=datetime.now, description='Creation timestamp')
-    updated_at: datetime = Field(default_factory=datetime.now, description='Last update timestamp')
+    created_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Creation timestamp')
+    updated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp')
     created_by: UUID = Field(description='User identifier')
 
     @field_validator('parameters', mode='before')

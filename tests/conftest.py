@@ -1,4 +1,5 @@
 import logging
+import time
 import uuid
 from contextlib import contextmanager
 from datetime import timedelta
@@ -41,7 +42,7 @@ def config():
 
 @pytest.fixture
 async def mongo_connection(config):
-    name_database = f'{uuid.uuid4().hex}_pytest'
+    name_database = f'{int(time.time())}_{uuid.uuid4().hex[:8]}_pytest'
     _client = AsyncIOMotorClient(str(config.mongo_db.dsn))
     await init_beanie(database=_client[name_database], document_models=BEANIE_MODELS)
     logger.info(f'Connected to MongoDB, db={name_database}')
@@ -178,15 +179,16 @@ async def client():
 @pytest.fixture
 async def mock_auth():
     fastapi = await get_context()[FASTAPI]
+    user_id = uuid.uuid4()
     fastapi.dependency_overrides[get_current_user] = lambda: UserData(
-        user_id=uuid.uuid4(),
+        user_id=user_id,
         username='test_user',
         email='test@test.com',
         full_name='Test User',
         disabled=False,
         hashed_password='',
     )
-    yield
+    yield user_id
     fastapi.dependency_overrides = {}
 
 

@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from functools import partial
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -18,8 +19,8 @@ class UserDocument(Document):
     hashed_password: str
     full_name: str | None = None
     disabled: bool | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc))
+    updated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc))
 
     class Settings:
         name = 'users'

@@ -1,7 +1,8 @@
 """PerformanceMetrics Beanie model - Hexagonal Architecture Adapter."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
+from functools import partial
 from uuid import UUID, uuid4
 
 from beanie import Document
@@ -41,7 +42,7 @@ class PerformanceMetricsDocument(Document):
     largest_win: DecimalField = Field(default=Decimal('0'), description='Largest winning trade')
     largest_loss: DecimalField = Field(default=Decimal('0'), description='Largest losing trade')
 
-    calculated_at: datetime = Field(default_factory=datetime.utcnow, description='Calculation timestamp')
+    calculated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Calculation timestamp')
 
     @field_validator('period_end', mode='after')
     @classmethod

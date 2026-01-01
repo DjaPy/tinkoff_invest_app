@@ -17,34 +17,29 @@ import pytest
 from starlette import status
 
 from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, TradingStrategyDocument
-
-# ==================== START STRATEGY TESTS (T009) ====================
-
+from src.algo_trading.adapters.models.position import PortfolioPositionDocument
 
 @pytest.mark.asyncio
-async def test_start_strategy_activates_inactive_strategy(client, config, services, mock_auth):
+async def test_start_strategy_activates_inactive_strategy(client, config, mock_auth, create_trading_strategy):
     """Test POST /api/v1/strategies/{strategy_id}/start activates a strategy"""
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.INACTIVE)
 
     async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}/start',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions - 200 OK with updated strategy
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
-
-        # Validate response using Pydantic model
         strategy = TradingStrategyDocument(**data)
-        assert strategy.strategy_id == strategy_id
+        assert strategy.strategy_id == strategy.strategy_id
         assert strategy.status == StrategyStatusEnum.ACTIVE
         assert strategy.updated_at is not None
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_not_found(client, config, services, mock_auth):
+async def test_start_strategy_not_found(client, config, mongo_connection, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -54,32 +49,30 @@ async def test_start_strategy_not_found(client, config, services, mock_auth):
     ) as response:
         assert response.status == status.HTTP_404_NOT_FOUND
         data = await response.json()
-        assert 'type' in data
+        assert 'detail' in data
         assert 'status' in data
         assert data['status'] == 404
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_conflict_invalid_state(client, config, services, mock_auth):
+async def test_start_strategy_conflict_invalid_state(client, config, mongo_connection, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/start returns 409 for invalid state transition"""
-    # Per OpenAPI spec: Strategy cannot be started if in invalid state
     strategy_id = uuid4()
 
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Should return 409 Conflict if strategy cannot be started
         if response.status == status.HTTP_409_CONFLICT:
             data = await response.json()
-            assert 'type' in data
+            assert 'detail' in data
             assert 'title' in data
             assert 'status' in data
             assert data['status'] == 409
 
 
 @pytest.mark.asyncio
-async def test_start_strategy_unauthorized(client, config, services, mock_auth):
+async def test_start_strategy_unauthorized(client, config):
     """Test POST /api/v1/strategies/{strategy_id}/start requires authentication"""
     strategy_id = uuid4()
 
@@ -92,39 +85,32 @@ async def test_start_strategy_unauthorized(client, config, services, mock_auth):
         assert data['status'] == 401
 
 
-# ==================== STOP STRATEGY TESTS (T010) ====================
-
-
 @pytest.mark.asyncio
-async def test_stop_strategy_halts_active_strategy(client, config):
+async def test_stop_strategy_halts_active_strategy(client, config, mongo_connection, mock_auth, create_trading_strategy):
     """Test POST /api/v1/strategies/{strategy_id}/stop halts a running strategy"""
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.ACTIVE)
 
     async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/stop',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}/stop',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions - 200 OK with updated strategy
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
-
-        # Validate response using Pydantic model
         strategy = TradingStrategyDocument(**data)
-        assert strategy.strategy_id == strategy_id
+        assert strategy.strategy_id == strategy.strategy_id
         assert strategy.status == StrategyStatusEnum.STOPPED
         assert strategy.updated_at is not None
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_closes_positions(client, config, services, mock_auth):
+async def test_stop_strategy_closes_positions(client, config, mongo_connection, mock_auth, create_trading_strategy):
     """Test POST /api/v1/strategies/{strategy_id}/stop closes all open positions"""
-    # Per OpenAPI spec description: "Halt a trading strategy and close all open positions"
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.ACTIVE)
 
     async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/stop',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}/stop',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
@@ -132,11 +118,10 @@ async def test_stop_strategy_closes_positions(client, config, services, mock_aut
 
         strategy = TradingStrategyDocument(**data)
         assert strategy.status == StrategyStatusEnum.STOPPED
-        # Implementation should handle position closing
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_not_found(client, config, services, mock_auth):
+async def test_stop_strategy_not_found(client, config, mongo_connection, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/stop returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -163,51 +148,63 @@ async def test_stop_strategy_unauthorized(client, config, services):
         assert data['status'] == 401
 
 
-# ==================== PAUSE STRATEGY TESTS (T011) ====================
-
-
 @pytest.mark.asyncio
-async def test_pause_strategy_temporarily_halts_execution(client, config, services, mock_auth):
+async def test_pause_strategy_temporarily_halts_execution(client, config, mock_auth, create_trading_strategy):
     """Test POST /api/v1/strategies/{strategy_id}/pause temporarily halts strategy"""
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.ACTIVE)
 
     async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/pause',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}/pause',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions - 200 OK with updated strategy
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
-        # Validate response using Pydantic model
         strategy = TradingStrategyDocument(**data)
-        assert strategy.strategy_id == strategy_id
+        assert strategy.strategy_id == strategy.strategy_id
         assert strategy.status == StrategyStatusEnum.PAUSED
         assert strategy.updated_at is not None
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_keeps_positions_open(client, config, services, mock_auth):
+async def test_pause_strategy_keeps_positions_open(
+    client,
+    config,
+    mongo_connection,
+    mock_auth,
+    create_trading_strategy,
+    create_position,
+):
     """Test POST /api/v1/strategies/{strategy_id}/pause keeps positions open"""
-    # Per OpenAPI spec description: "Temporarily halt strategy execution without closing positions"
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.ACTIVE)
+
+    position1 = await create_position(strategy_id=strategy.strategy_id, instrument='AAPL')
+    position2 = await create_position(strategy_id=strategy.strategy_id, instrument='MSFT')
 
     async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/pause',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}/pause',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        strategy = TradingStrategyDocument(**data)
-        assert strategy.status == StrategyStatusEnum.PAUSED
-        # Implementation should NOT close positions (unlike stop)
+        paused_strategy = TradingStrategyDocument(**data)
+        assert paused_strategy.status == StrategyStatusEnum.PAUSED
+
+
+        positions = await PortfolioPositionDocument.find(
+            PortfolioPositionDocument.strategy_id == strategy.strategy_id
+        ).to_list()
+    
+        assert len(positions) == 2
+        assert position1.position_id in {p.position_id for p in positions}
+        assert position2.position_id in {p.position_id for p in positions}
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_not_found(client, config, services, mock_auth):
+async def test_pause_strategy_not_found(client, config, mongo_connection, mock_auth):
     """Test POST /api/v1/strategies/{strategy_id}/pause returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -221,7 +218,7 @@ async def test_pause_strategy_not_found(client, config, services, mock_auth):
 
 
 @pytest.mark.asyncio
-async def test_pause_strategy_unauthorized(client, config, services, mock_auth):
+async def test_pause_strategy_unauthorized(client, config):
     """Test POST /api/v1/strategies/{strategy_id}/pause requires authentication"""
     strategy_id = uuid4()
 
@@ -234,12 +231,13 @@ async def test_pause_strategy_unauthorized(client, config, services, mock_auth):
         assert data['status'] == 401
 
 
-# ==================== STATE TRANSITION TESTS ====================
-
-
 @pytest.mark.parametrize(
     'action,expected_status',
-    [('start', StrategyStatusEnum.ACTIVE), ('stop', StrategyStatusEnum.STOPPED), ('pause', StrategyStatusEnum.PAUSED)],
+    [
+        ('start', StrategyStatusEnum.ACTIVE),
+        ('stop', StrategyStatusEnum.STOPPED),
+        ('pause', StrategyStatusEnum.PAUSED),
+    ],
 )
 @pytest.mark.asyncio
 async def test_lifecycle_actions_update_status_correctly(client, config, action, expected_status):

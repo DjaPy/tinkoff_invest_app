@@ -12,6 +12,7 @@ from src.algo_trading.adapters.models import (
     MarketMakingParameters,
     MeanReversionParameters,
     MomentumParameters,
+    PortfolioPositionDocument,
     RiskControls,
     StrategyStatusEnum,
     StrategyTypeEnum,
@@ -180,4 +181,24 @@ def create_order(get_session, fake, pydantic_generator_data) -> Callable:
         )
         await trade_order.insert()
         return trade_order
+    return _inner
+
+
+@pytest.fixture
+def create_position(get_session, fake, pydantic_generator_data) -> Callable:
+    async def _inner(**kwargs) -> PortfolioPositionDocument:
+        average_price = kwargs.pop('average_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))))
+        current_price = kwargs.pop('current_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))))
+
+        position = PortfolioPositionDocument(
+            position_id=kwargs.pop('position_id', uuid.uuid4()),
+            strategy_id=kwargs.pop('strategy_id', uuid.uuid4()),
+            instrument=kwargs.pop('instrument', fake.word().upper()),
+            quantity=kwargs.pop('quantity', Decimal(str(fake.pyint(min_value=1, max_value=100)))),
+            average_price=average_price,
+            current_price=current_price,
+            updated_at=kwargs.pop('updated_at', datetime.now(tz=UTC)),
+        )
+        await position.insert()
+        return position
     return _inner

@@ -28,23 +28,18 @@ class PositionListResponse(BaseModel):
     total_pnl: Decimal = Field(description='Total unrealized P&L')
 
 
-# ==================== GET /api/v1/positions TESTS ====================
-
-
 @pytest.mark.asyncio
-async def test_get_positions_returns_position_list(client, config, services, mock_auth):
+async def test_get_positions_returns_position_list(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions returns list of positions"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
 
-        # Validate response using Pydantic model
         response_model = PositionListResponse(**data)
         assert isinstance(response_model.positions, list)
         assert isinstance(response_model.total_value, Decimal)
@@ -53,7 +48,7 @@ async def test_get_positions_returns_position_list(client, config, services, moc
 
 
 @pytest.mark.asyncio
-async def test_get_positions_validates_position_structure(client, config, services, mock_auth):
+async def test_get_positions_validates_position_structure(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions returns positions with correct Pydantic structure"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -64,7 +59,6 @@ async def test_get_positions_validates_position_structure(client, config, servic
 
         response_model = PositionListResponse(**data)
 
-        # If positions exist, validate each position
         if response_model.positions:
             for position in response_model.positions:
                 assert position.position_id is not None
@@ -98,7 +92,7 @@ async def test_get_positions_empty_list(client, config, mongo_connection, mock_a
 
 
 @pytest.mark.asyncio
-async def test_get_positions_filter_by_strategy_id(client, config, services, mock_auth):
+async def test_get_positions_filter_by_strategy_id(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions can filter by strategy_id"""
     strategy_id = uuid4()
 
@@ -110,13 +104,12 @@ async def test_get_positions_filter_by_strategy_id(client, config, services, moc
         data = await response.json()
 
         response_model = PositionListResponse(**data)
-        # All positions should belong to this strategy
         for position in response_model.positions:
             assert position.strategy_id == strategy_id
 
 
 @pytest.mark.asyncio
-async def test_get_positions_filter_by_instrument(client, config, services, mock_auth):
+async def test_get_positions_filter_by_instrument(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions can filter by instrument"""
     instrument = 'AAPL'
 
@@ -128,13 +121,12 @@ async def test_get_positions_filter_by_instrument(client, config, services, mock
         data = await response.json()
 
         response_model = PositionListResponse(**data)
-        # All positions should be for this instrument
         for position in response_model.positions:
             assert position.instrument == instrument
 
 
 @pytest.mark.asyncio
-async def test_get_positions_calculates_totals_correctly(client, config, services, mock_auth):
+async def test_get_positions_calculates_totals_correctly(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions calculates total_value and total_pnl correctly"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -145,7 +137,6 @@ async def test_get_positions_calculates_totals_correctly(client, config, service
 
         response_model = PositionListResponse(**data)
 
-        # Verify totals match sum of positions
         if response_model.positions:
             calculated_value = sum(pos.market_value for pos in response_model.positions)
             calculated_pnl = sum(pos.unrealized_pnl for pos in response_model.positions)
@@ -155,7 +146,7 @@ async def test_get_positions_calculates_totals_correctly(client, config, service
 
 
 @pytest.mark.asyncio
-async def test_get_positions_unauthorized(client, config, services, mock_auth):
+async def test_get_positions_unauthorized(client, config):
     """Test GET /api/v1/positions requires authentication"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions',
@@ -167,21 +158,19 @@ async def test_get_positions_unauthorized(client, config, services, mock_auth):
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_returns_position_details(client, config, mock_auth):
+async def test_get_position_by_id_returns_position_details(client, config, mongo_connection, mock_auth, create_position):
     """Test GET /api/v1/positions/{position_id} returns position details"""
-    position_id = uuid4()
+    created_position = await create_position()
+    position_id = created_position.position_id
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions
         assert response.status == status.HTTP_200_OK
         assert 'application/json' in response.headers['content-type']
 
         data = await response.json()
-
-        # Validate response using Pydantic model
         position = PortfolioPositionDocument(**data)
         assert position.position_id == position_id
         assert position.strategy_id is not None
@@ -192,9 +181,10 @@ async def test_get_position_by_id_returns_position_details(client, config, mock_
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_includes_computed_fields(client, config, services, mock_auth):
+async def test_get_position_by_id_includes_computed_fields(client, config, mock_auth, create_position):
     """Test GET /api/v1/positions/{position_id} includes computed fields"""
-    position_id = uuid4()
+    created_position = await create_position()
+    position_id = created_position.position_id
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{position_id}',
@@ -204,12 +194,10 @@ async def test_get_position_by_id_includes_computed_fields(client, config, servi
         data = await response.json()
 
         position = PortfolioPositionDocument(**data)
-        # Verify computed fields are present
         assert position.unrealized_pnl is not None
         assert position.market_value is not None
         assert position.pnl_percent is not None
 
-        # Verify calculations are correct
         expected_pnl = (position.current_price - position.average_price) * position.quantity
         assert position.unrealized_pnl == expected_pnl
 
@@ -218,7 +206,7 @@ async def test_get_position_by_id_includes_computed_fields(client, config, servi
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_not_found(client, config, services, mock_auth):
+async def test_get_position_by_id_not_found(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/positions/{position_id} returns 404 for non-existent position"""
     non_existent_id = uuid4()
 
@@ -232,7 +220,7 @@ async def test_get_position_by_id_not_found(client, config, services, mock_auth)
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_unauthorized(client, config, services, mock_auth):
+async def test_get_position_by_id_unauthorized(client, config):
     """Test GET /api/v1/positions/{position_id} requires authentication"""
     position_id = uuid4()
 
@@ -247,14 +235,13 @@ async def test_get_position_by_id_unauthorized(client, config, services, mock_au
 
 @pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
 @pytest.mark.asyncio
-async def test_get_position_by_id_invalid_uuid_format(client, config, services, mock_auth, invalid_id):
+async def test_get_position_by_id_invalid_uuid_format(client, config, mongo_connection, mock_auth, invalid_id):
     """Test GET /api/v1/positions/{position_id} validates UUID format"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/positions/{invalid_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Should return 400 or 422 for invalid UUID format
-        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
+        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_CONTENT]
         data = await response.json()
-        assert 'type' in data
+        assert 'invalid_params' in data
         assert 'status' in data

@@ -183,7 +183,7 @@ async def test_get_orders_validation_error_invalid_limit(client, config, mock_au
         url=f'http://127.0.0.1:{config.http.port}/api/v1/orders?limit=1000',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        assert response.status == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status == status.HTTP_422_UNPROCESSABLE_CONTENT
         data = await response.json()
         assert 'status' in data
         assert data['status'] == 422

@@ -65,7 +65,7 @@ async def test_post_backtest_validates_required_fields(client, config, mock_auth
         json=invalid_request,
     ) as response:
         data = await response.json()
-        assert response.status == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status == status.HTTP_422_UNPROCESSABLE_CONTENT
         assert 'title' in data
         assert 'status' in data
         assert data['status'] == 422
@@ -99,7 +99,7 @@ async def test_post_backtest_validates_date_range(client, config, mock_auth):
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
         json=invalid_request,
     ) as response:
-        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
+        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_CONTENT]
         data = await response.json()
         assert 'title' in data
         assert 'status' in data
@@ -134,7 +134,7 @@ async def test_post_backtest_validates_initial_capital(client, config, mock_auth
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
         json=invalid_request,
     ) as response:
-        assert response.status == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status == status.HTTP_422_UNPROCESSABLE_CONTENT
         data = await response.json()
         assert data['status'] == 422
 
@@ -167,7 +167,7 @@ async def test_post_backtest_validates_instruments_list(client, config, mock_aut
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
         json=invalid_request,
     ) as response:
-        assert response.status == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status == status.HTTP_422_UNPROCESSABLE_CONTENT
         data = await response.json()
         assert data['status'] == 422
 

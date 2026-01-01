@@ -18,6 +18,7 @@ from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
     CreateStrategyRequestSchema,
     StrategyListResponseSchema,
+    TradingStrategyResponseSchema,
     UpdateStrategyRequestSchema,
 )
 
@@ -120,11 +121,11 @@ async def get_strategy(strategy_id: UUID) -> TradingStrategyDocument:
 
 @strategies_router.put(
     '/{strategy_id}',
-    response_model=TradingStrategyDocument,
+    response_model=TradingStrategyResponseSchema,
     summary='Update trading strategy',
     description='Update strategy configuration and risk controls',
 )
-async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) -> TradingStrategyDocument:
+async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) -> TradingStrategyResponseSchema:
     """
     Update existing strategy (T044).
 
@@ -140,24 +141,17 @@ async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) 
         HTTPException 422: Validation error in request data
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
+    # Use repository layer for update
+    strategy = await StrategyRepository.update_strategy(
+        strategy_id=strategy_id,
+        update_data=body.model_dump(exclude_none=True),
+    )
 
     if not strategy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
-    # Update fields if provided
-    if body.name is not None:
-        strategy.name = body.name
-
-    if body.parameters is not None:
-        strategy.parameters = body.parameters
-
-    if body.risk_controls is not None:
-        strategy.risk_controls = body.risk_controls
-
-    strategy.updated_at = datetime.now(UTC)
-
-    return await StrategyRepository.update(strategy)
+    # Convert domain model to response schema
+    return TradingStrategyResponseSchema.from_document(strategy)
 
 
 @strategies_router.delete(
@@ -168,7 +162,7 @@ async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) 
 )
 async def delete_strategy(strategy_id: UUID) -> None:
     """
-    Delete strategy (T045).
+    Delete strategy.
 
     Args:
         strategy_id: Unique strategy identifier
@@ -183,7 +177,6 @@ async def delete_strategy(strategy_id: UUID) -> None:
     if not strategy:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
 
-    # Cannot delete active strategy
     if strategy.status == StrategyStatusEnum.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,

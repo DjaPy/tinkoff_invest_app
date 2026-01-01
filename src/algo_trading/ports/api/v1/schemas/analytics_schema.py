@@ -13,12 +13,12 @@ from src.algo_trading.adapters.models import RiskControls, StrategyTypeEnum
 def check_period(from_date: datetime | None, to_date: datetime | None, period: PeriodEnum | None) -> None:
     if period == PeriodEnum.custom and (from_date is None or to_date is None):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f'from_date and to_date are required when period={period}',
         )
     if period is None and (from_date is None or to_date is None):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f'from_date and to_date are required when period={period}',
         )
 

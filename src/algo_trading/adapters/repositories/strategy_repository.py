@@ -3,6 +3,7 @@
 Data access layer for TradingStrategy model.
 """
 
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
@@ -104,6 +105,41 @@ class StrategyRepository:
         Raises:
             ValueError: If strategy not found
         """
+        await strategy.save()
+        return strategy
+
+    @staticmethod
+    async def update_strategy(
+        strategy_id: UUID,
+        update_data: dict[str, Any],
+    ) -> TradingStrategyDocument | None:
+        """
+        Update strategy with partial data.
+
+        Args:
+            strategy_id: Strategy UUID
+            update_data: Fields to update (name, parameters, risk_controls)
+
+        Returns:
+            Updated strategy or None if not found
+        """
+        strategy = await StrategyRepository.find_by_id(strategy_id)
+        if not strategy:
+            return None
+
+        # Update only provided fields
+        if 'name' in update_data and update_data['name'] is not None:
+            strategy.name = update_data['name']
+
+        if 'parameters' in update_data and update_data['parameters'] is not None:
+            strategy.parameters = update_data['parameters']
+
+        if 'risk_controls' in update_data and update_data['risk_controls'] is not None:
+            strategy.risk_controls = update_data['risk_controls']
+
+        # Update timestamp
+        strategy.updated_at = datetime.now(timezone.utc)
+
         await strategy.save()
         return strategy
 

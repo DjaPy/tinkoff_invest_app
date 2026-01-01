@@ -457,7 +457,7 @@ async def compare_strategies(
 
     if period == PeriodEnum.custom and (from_date is None or to_date is None):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail='from_date and to_date are required when period=custom',
         )
 

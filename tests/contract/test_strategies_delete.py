@@ -12,25 +12,25 @@ from uuid import uuid4
 import pytest
 from starlette import status
 
+from algo_trading.adapters.models import TradingStrategyDocument
+from algo_trading.enums import StrategyStatusEnum
 
 
-async def test_delete_strategy_removes_existing_strategy(client, config, services, mock_auth):
+async def test_delete_strategy_removes_existing_strategy(client, config, mongo_connection, mock_auth, create_trading_strategy):
     """Test DELETE /api/v1/strategies/{strategy_id} successfully deletes a strategy"""
-    strategy_id = uuid4()
+    strategy = await create_trading_strategy(status=StrategyStatusEnum.INACTIVE)
 
     async with client.delete(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy.strategy_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Contract assertions - 204 No Content on successful deletion
         assert response.status == status.HTTP_204_NO_CONTENT
-        # 204 responses should not have content
         content = await response.text()
         assert content == '' or content is None
 
 
 
-async def test_delete_strategy_not_found(client, config, services, mock_auth):
+async def test_delete_strategy_not_found(client, config, mongo_connection, mock_auth):
     """Test DELETE /api/v1/strategies/{strategy_id} returns 404 for non-existent strategy"""
     non_existent_id = uuid4()
 
@@ -40,19 +40,17 @@ async def test_delete_strategy_not_found(client, config, services, mock_auth):
     ) as response:
         assert response.status == status.HTTP_404_NOT_FOUND
         data = await response.json()
-        # RFC7807 error format
-        assert 'type' in data
+        assert 'detail' in data
         assert 'title' in data
         assert 'status' in data
         assert data['status'] == 404
 
 
 
-async def test_delete_strategy_unauthorized_without_token(client, config, services):
+async def test_delete_strategy_unauthorized_without_token(client, config, mongo_connection):
     """Test DELETE /api/v1/strategies/{strategy_id} requires authentication (401)"""
     strategy_id = uuid4()
 
-    # No Authorization header
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Content-Type': 'application/json'},
@@ -64,45 +62,38 @@ async def test_delete_strategy_unauthorized_without_token(client, config, servic
 
 
 
-async def test_delete_active_strategy_returns_conflict(client, config):
+async def test_delete_active_strategy_returns_conflict(client, config, mongo_connection):
     """Test DELETE /api/v1/strategies/{strategy_id} returns 409 for active strategy"""
-    # Per OpenAPI spec: Cannot delete active strategy
     active_strategy_id = uuid4()
 
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{active_strategy_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Should return 409 Conflict if strategy is active
         if response.status == status.HTTP_409_CONFLICT:
             data = await response.json()
-            # RFC7807 error format
-            assert 'type' in data
+            assert 'detail' in data
             assert 'title' in data
             assert 'status' in data
             assert data['status'] == 409
-            # Error message should indicate strategy cannot be deleted
             assert 'active' in data.get('detail', '').lower() or 'cannot delete' in data.get('detail', '').lower()
 
 
 
-async def test_delete_strategy_idempotent(client, config, services, mock_auth):
+async def test_delete_strategy_idempotent(client, config, mongo_connection, mock_auth):
     """Test DELETE /api/v1/strategies/{strategy_id} is idempotent (deleting twice)"""
     strategy_id = uuid4()
 
-    # First deletion
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
         pass
 
-    # Second deletion of same strategy
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Should return 404 since strategy no longer exists
         assert response.status == status.HTTP_404_NOT_FOUND
 
 
@@ -115,7 +106,6 @@ async def test_delete_strategy_handles_internal_error(client, config):
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # If there's an internal error, it should follow RFC7807 format
         if response.status == status.HTTP_500_INTERNAL_SERVER_ERROR:
             data = await response.json()
             assert 'type' in data
@@ -125,15 +115,14 @@ async def test_delete_strategy_handles_internal_error(client, config):
 
 
 @pytest.mark.parametrize('invalid_id', ['not-a-uuid', '12345', 'invalid-format'])
-
-async def test_delete_strategy_invalid_uuid_format(client, config, services, mock_auth, invalid_id):
+async def test_delete_strategy_invalid_uuid_format(client, config, mock_auth, invalid_id):
     """Test DELETE /api/v1/strategies/{strategy_id} validates UUID format"""
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{invalid_id}',
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
     ) as response:
-        # Should return 400 or 422 for invalid UUID format
-        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_ENTITY]
+        assert response.status in [status.HTTP_400_BAD_REQUEST, status.HTTP_422_UNPROCESSABLE_CONTENT]
         data = await response.json()
-        assert 'type' in data
+        assert 'invalid_params' in data
         assert 'status' in data
+        assert data['status'] == status.HTTP_422_UNPROCESSABLE_CONTENT

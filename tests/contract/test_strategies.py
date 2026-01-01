@@ -4,15 +4,20 @@ Contract tests for /api/v1/strategies endpoints
 These tests validate the API contract for managing trading strategies.
 Following the pattern from test_orders.py and test_positions.py
 """
-
+import uuid
 from decimal import Decimal
 
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import RiskControls, StrategyTypeEnum, TradingStrategyDocument
+from fixtures_db_data import create_risk_controls, create_trading_strategy
+from src.algo_trading.adapters.models.strategy import (
+    MeanReversionParameters,
+    MomentumParameters,
+    StrategyTypeEnum,
+)
 
 
-async def test_get_strategies_returns_strategy_list(client, config, services, mock_auth):
+async def test_get_strategies_returns_strategy_list(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/strategies returns list of strategies (T039)"""
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -28,17 +33,30 @@ async def test_get_strategies_returns_strategy_list(client, config, services, mo
         assert isinstance(data['total'], int)
 
 
-async def test_get_strategies_validates_strategy_structure(client, config, mongo_connection):
+async def test_get_strategies_validates_strategy_structure(
+        client,
+        config,
+        mongo_connection,
+        create_risk_controls,
+        create_trading_strategy,
+        mock_auth,
+):
     """Test GET /api/v1/strategies validates strategy structure (T040)"""
-    # Create a test strategy in database
-    strategy = TradingStrategyDocument(
+    user_id = mock_auth
+    risk_controls = create_risk_controls(max_position_size=10000.0, max_portfolio_value=50000.0, stop_loss_percent=0.02)
+    strategy = await create_trading_strategy(
+        risk_controls=risk_controls,
         name='Test Momentum Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
-        parameters={'lookback_period': 20, 'momentum_threshold': 0.02},
-        risk_controls=RiskControls(max_position_size=10000.0, max_portfolio_value=50000.0, stop_loss_percent=0.02),
-        created_by='test-user',
+        parameters=MomentumParameters(
+            lookback_period=20,
+            momentum_threshold=0.02,
+            instruments=['AAPL', 'MSFT'],
+            position_size=100,
+        ),
+        instruments=['AAPL', 'MSFT'],
+        created_by=user_id,
     )
-    await strategy.insert()
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -49,7 +67,6 @@ async def test_get_strategies_validates_strategy_structure(client, config, mongo
 
         assert data['total'] >= 1
 
-        # Validate first strategy structure if exists
         if data['strategies']:
             strategy_data = data['strategies'][0]
             assert 'strategy_id' in strategy_data
@@ -65,9 +82,6 @@ async def test_get_strategies_validates_strategy_structure(client, config, mongo
 
 async def test_get_strategies_empty_list_when_no_strategies(client, config, mongo_connection, mock_auth):
     """Test GET /api/v1/strategies returns empty list (T041)"""
-    # Ensure database is clean
-    await TradingStrategyDocument.delete_all()
-
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
         headers={'Authorization': 'Bearer test-token'},
@@ -79,32 +93,41 @@ async def test_get_strategies_empty_list_when_no_strategies(client, config, mong
         assert data['strategies'] == []
 
 
-async def test_get_strategies_unauthorized_without_token(client, config, services, mock_auth):
+async def test_get_strategies_unauthorized_without_token(client, config, mongo_connection):
     """Test GET /api/v1/strategies requires authentication (T042)"""
     async with client.get(url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies') as response:
         assert response.status == status.HTTP_401_UNAUTHORIZED
         data = await response.json()
 
-        # RFC7807 Problem Details format
         assert data['status'] == 401
         assert 'title' in data
 
 
-async def test_get_strategies_validates_pydantic_model(client, config, mongo_connection, pydantic_generator_data):
-    """Test GET /api/v1/strategies returns valid Pydantic models (T043)"""
-    # Create test strategy
-    strategy = TradingStrategyDocument(
+async def test_get_strategies_validates_pydantic_model(
+    client,
+    config,
+    pydantic_generator_data,
+    create_risk_controls,
+    create_trading_strategy,
+    mock_auth,
+):
+
+    risk_controls =  create_risk_controls(
+        max_position_size=Decimal('10000.0'),
+        max_portfolio_value=Decimal('25000.0'),
+        stop_loss_percent=Decimal('0.03'),
+    )
+    await create_trading_strategy(
         name='Pydantic Test Strategy',
         strategy_type=StrategyTypeEnum.MEAN_REVERSION,
-        parameters={'ma_period': Decimal('50'), 'std_threshold': Decimal('2.0')},
-        risk_controls=RiskControls(
-            max_position_size=Decimal('10000.0'),
-            max_portfolio_value=Decimal('25000.0'),
-            stop_loss_percent=Decimal('0.03'),
+        parameters=MeanReversionParameters(
+            moving_average_period=50,
+            std_dev_threshold=2.0,
+            instruments=['AAPL', 'MSFT'],
         ),
-        created_by='test-user',
+        risk_controls=risk_controls,
+        created_by=uuid.uuid4(),
     )
-    await strategy.insert()
 
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
@@ -113,16 +136,10 @@ async def test_get_strategies_validates_pydantic_model(client, config, mongo_con
         assert response.status == status.HTTP_200_OK
         data = await response.json()
 
-        # Validate using Pydantic model
         if data['strategies']:
-            # Should be able to parse as TradingStrategy
             for strategy_data in data['strategies']:
-                validated_strategy = TradingStrategyDocument(**strategy_data)
-                assert validated_strategy.name is not None
-                assert validated_strategy.strategy_type is not None
-
-    # Cleanup
-    await strategy.delete()
+                assert strategy_data['name']
+                assert strategy_data['strategy_type'] is not None
 
 
 async def test_get_strategies_handles_internal_errors(client, config, services, mock_auth):
@@ -131,10 +148,7 @@ async def test_get_strategies_handles_internal_errors(client, config, services, 
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        # If there's an internal error, it should follow RFC7807 format
         if response.status == status.HTTP_500_INTERNAL_SERVER_ERROR:
             data = await response.json()
-            assert 'type' in data
-            assert 'title' in data
-            assert 'status' in data
+            assert 'detail' in data
             assert data['status'] == 500

@@ -2,10 +2,13 @@
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import partial
 from uuid import UUID, uuid4
 
 from beanie import Document
 from pydantic import Field, computed_field
+
+from src.algo_trading.adapters.models.common import DecimalField
 
 
 class PortfolioPositionDocument(Document):
@@ -20,11 +23,11 @@ class PortfolioPositionDocument(Document):
     strategy_id: UUID = Field(description='Strategy holding this position')
     instrument: str = Field(min_length=1, description='Trading instrument')
 
-    quantity: Decimal = Field(description='Position size (positive=long, negative=short)')
-    average_price: Decimal = Field(gt=0, description='Average cost basis')
-    current_price: Decimal = Field(gt=0, description='Current market price')
+    quantity: DecimalField = Field(description='Position size (positive=long, negative=short)')
+    average_price: DecimalField = Field(gt=0, description='Average cost basis')
+    current_price: DecimalField = Field(gt=0, description='Current market price')
 
-    updated_at: datetime = Field(default_factory=datetime.utcnow, description='Last update timestamp')
+    updated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp')
 
     @computed_field  # type: ignore[prop-decorator]
     @property
