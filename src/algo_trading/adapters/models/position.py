@@ -27,7 +27,9 @@ class PortfolioPositionDocument(Document):
     average_price: DecimalField = Field(gt=0, description='Average cost basis')
     current_price: DecimalField = Field(gt=0, description='Current market price')
 
-    updated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp')
+    updated_at: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp',
+    )
 
     @computed_field  # type: ignore[prop-decorator]
     @property

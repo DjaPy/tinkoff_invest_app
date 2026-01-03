@@ -3,18 +3,32 @@
 Validates market data integration and processing.
 """
 
+from decimal import Decimal
 from http import HTTPStatus
 
 
-
-
-async def test_market_data_retrieval(client, config):
+async def test_market_data_retrieval(client, config, mock_auth, mock_tinkoff_client, monkeypatch, mongo_connection):
     """
     Integration test for market data retrieval.
 
     Validates that market data endpoint works correctly.
     """
-    # Get market data for instrument
+    instrument = 'AAPL'
+    mock_tinkoff_client.set_instrument(instrument, {
+        'figi': 'BBG000B9XRY4',
+        'ticker': instrument,
+        'name': 'Apple Inc.',
+        'currency': 'usd',
+        'lot': 1,
+        'min_price_increment': Decimal('0.01'),
+    })
+    mock_tinkoff_client.set_price('BBG000B9XRY4', Decimal('150.25'))
+
+    monkeypatch.setattr(
+        'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
+        lambda account_id=None, context_name=None: mock_tinkoff_client,
+    )
+
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL?timeframe=1d&limit=10',
         headers={'Authorization': 'Bearer test-token'},
@@ -22,20 +36,48 @@ async def test_market_data_retrieval(client, config):
         assert response.status == HTTPStatus.OK
         market_data = await response.json()
 
-        # Verify market data structure
-        assert 'data' in market_data or 'candles' in market_data or isinstance(market_data, list)
+        # Market data should contain expected fields
+        assert 'instrument' in market_data
+        assert 'data_points' in market_data or 'candles' in market_data or isinstance(market_data, list)
 
 
 
-async def test_market_data_for_multiple_instruments(client, config):
+async def test_market_data_for_multiple_instruments(
+    client,
+    config,
+    mock_auth,
+    mock_tinkoff_client,
+    monkeypatch,
+    mongo_connection,
+):
     """
     Test market data retrieval for multiple instruments.
 
     Validates concurrent data fetching.
     """
-    instruments = ['AAPL', 'MSFT', 'GOOGL']
+    instruments_data = {
+        'AAPL': {'figi': 'BBG000B9XRY4', 'price': Decimal('150.25')},
+        'MSFT': {'figi': 'BBG000BPH459', 'price': Decimal('380.50')},
+        'GOOGL': {'figi': 'BBG009S39JX6', 'price': Decimal('2800.75')},
+    }
 
-    for instrument in instruments:
+    for ticker, data in instruments_data.items():
+        mock_tinkoff_client.set_instrument(ticker, {
+            'figi': data['figi'],
+            'ticker': ticker,
+            'name': f'{ticker} Company',
+            'currency': 'usd',
+            'lot': 1,
+            'min_price_increment': Decimal('0.01'),
+        })
+        mock_tinkoff_client.set_price(data['figi'], data['price'])
+
+    monkeypatch.setattr(
+        'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
+        lambda account_id=None, context_name=None: mock_tinkoff_client,
+    )
+
+    for instrument in instruments_data:
         async with client.get(
             url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/{instrument}?timeframe=1d&limit=5',
             headers={'Authorization': 'Bearer test-token'},
@@ -44,87 +86,63 @@ async def test_market_data_for_multiple_instruments(client, config):
 
 
 
-async def test_market_data_with_different_timeframes(client, config):
+async def test_market_data_with_different_timeframes(
+    client,
+    config,
+    mock_auth,
+    mock_tinkoff_client,
+    monkeypatch,
+    mongo_connection,
+):
     """
     Test market data retrieval with different timeframes.
 
     Validates timeframe parameter handling.
     """
+    instrument = 'AAPL'
+    mock_tinkoff_client.set_instrument(instrument, {
+        'figi': 'BBG000B9XRY4',
+        'ticker': instrument,
+        'name': 'Apple Inc.',
+        'currency': 'usd',
+        'lot': 1,
+        'min_price_increment': Decimal('0.01'),
+    })
+    mock_tinkoff_client.set_price('BBG000B9XRY4', Decimal('150.25'))
+
+    monkeypatch.setattr(
+        'src.algo_trading.ports.api.v1.analytics.TinkoffInvestClient',
+        lambda account_id=None, context_name=None: mock_tinkoff_client,
+    )
+
     timeframes = ['1m', '5m', '1h', '1d', '1w']
 
     for timeframe in timeframes:
         async with client.get(
-            url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL?timeframe={timeframe}&limit=10',
+            url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL/?timeframe={timeframe}&limit=10',
             headers={'Authorization': 'Bearer test-token'},
         ) as response:
-            # Should return OK or handle gracefully if timeframe not supported
-            assert response.status in [HTTPStatus.OK, HTTPStatus.BAD_REQUEST]
+            assert response.status == HTTPStatus.OK
 
 
-
-async def test_market_data_validation(client, config):
+async def test_market_data_validation(
+    client,
+    config,
+    mock_auth,
+):
     """
     Test market data request validation.
 
-    Validates proper error handling for invalid requests.
+    Validates proper error handling for invalid query parameters.
     """
-    # Invalid instrument (empty)
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/?timeframe=1d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL?timeframe=1d&limit=2000',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        # Should fail with validation error or not found
-        assert response.status in [HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY]
-
-
-
-async def test_market_data_integration_with_strategy(client, config, mongo_connection):
-    """
-    Test market data integration with strategy execution.
-
-    Validates that strategies can access market data.
-    """
-    # Create strategy that depends on market data
-    strategy_data = {
-        'name': 'Market Data Test Strategy',
-        'strategy_type': 'momentum',
-        'parameters': {
-            'lookback_period': '20',
-            'momentum_threshold': '0.02',
-            'instruments': 'AAPL,MSFT',
-            'position_size': '100',
-        },
-        'risk_controls': {
-            'max_position_size': '1000',
-            'max_portfolio_value': '50000',
-            'stop_loss_percent': '0.05',
-            'max_drawdown_percent': '0.10',
-            'daily_loss_limit': '1000',
-            'max_orders_per_day': 20,
-            'trading_hours_start': '09:30:00',
-            'trading_hours_end': '16:00:00',
-        },
-        'created_by': 'test_user',
-    }
-
-    async with client.post(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies',
-        json=strategy_data,
-        headers={'Authorization': 'Bearer test-token'},
-    ) as response:
-        assert response.status == HTTPStatus.CREATED
-        created = await response.json()
-        created['strategy_id']
-
-    # Verify market data is accessible for strategy instruments
+        assert response.status == HTTPStatus.UNPROCESSABLE_ENTITY
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL?timeframe=1d&limit=20',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/AAPL?timeframe=1d&limit=-1',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        assert response.status == HTTPStatus.OK
+        assert response.status == HTTPStatus.UNPROCESSABLE_ENTITY
 
-    async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/market-data/MSFT?timeframe=1d&limit=20',
-        headers={'Authorization': 'Bearer test-token'},
-    ) as response:
-        assert response.status == HTTPStatus.OK

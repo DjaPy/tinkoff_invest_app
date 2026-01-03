@@ -12,11 +12,12 @@ from uuid import uuid4
 import pytest
 from starlette import status
 
-from algo_trading.adapters.models import TradingStrategyDocument
-from algo_trading.enums import StrategyStatusEnum
+from src.algo_trading.enums import StrategyStatusEnum
 
 
-async def test_delete_strategy_removes_existing_strategy(client, config, mongo_connection, mock_auth, create_trading_strategy):
+async def test_delete_strategy_removes_existing_strategy(
+        client, config, mongo_connection, mock_auth, create_trading_strategy,
+):
     """Test DELETE /api/v1/strategies/{strategy_id} successfully deletes a strategy"""
     strategy = await create_trading_strategy(status=StrategyStatusEnum.INACTIVE)
 

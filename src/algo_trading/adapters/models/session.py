@@ -2,10 +2,10 @@
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from functools import partial
 from uuid import UUID, uuid4
 
 from beanie import Document
-from mypy.plugins.default import partial
 from pydantic import Field, ValidationInfo, field_validator
 
 from src.algo_trading.adapters.models.common import DecimalField
@@ -22,7 +22,10 @@ class TradingSessionDocument(Document):
     session_id: UUID = Field(default_factory=uuid4, description='Unique session identifier')
     strategy_id: UUID = Field(description='Strategy being executed')
 
-    session_start: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Session start')
+    session_start: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc),
+        description='Session start',
+    )
     session_end: datetime | None = Field(None, description='Session end (None if active)')
 
     orders_placed: int = Field(default=0, ge=0, description='Total orders placed in session')

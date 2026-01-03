@@ -30,10 +30,11 @@ async def test_get_strategy_performance_returns_metrics(
     strategy_id = uuid4()
 
     strategy: TradingStrategyDocument = await create_trading_strategy(strategy_id=strategy_id)
+    base_time = datetime.now(tz=UTC)
 
-    for day_offset in range(35):
-        session_start = datetime.now(tz=UTC) - timedelta(days=day_offset+1)
-        session_end = datetime.now(tz=UTC) - timedelta(days=day_offset)
+    for day_offset in range(25):
+        session_start = base_time - timedelta(days=day_offset+1)
+        session_end = base_time - timedelta(days=day_offset)
 
         session = await create_trading_sessions(
             strategy_id=strategy.strategy_id,

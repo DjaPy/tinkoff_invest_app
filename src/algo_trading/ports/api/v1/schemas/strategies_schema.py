@@ -52,7 +52,7 @@ class TradingStrategyResponseSchema(BaseModel):
             if dt.tzinfo is None:
                 return dt.replace(tzinfo=timezone.utc)
             return dt
-        elif isinstance(v, datetime):
+        if isinstance(v, datetime):
             if v.tzinfo is None:
                 return v.replace(tzinfo=timezone.utc)
             return v

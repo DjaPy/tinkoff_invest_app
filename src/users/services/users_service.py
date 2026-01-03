@@ -1,3 +1,5 @@
+import uuid
+
 from pymongo.errors import DuplicateKeyError
 from src.users.adapters.dto_models.users import UserData
 from src.users.adapters.repository.user_repository import UserRepository
@@ -20,6 +22,7 @@ class UsersService:
     async def create_user(self, register_data: RegistrationRequestSchema) -> UserResponseSchema:
         hashed_password = get_password_hash(register_data.password)
         user_data = UserData(
+            user_id=uuid.uuid4(),
             username=register_data.username,
             hashed_password=hashed_password,
             email=register_data.email,

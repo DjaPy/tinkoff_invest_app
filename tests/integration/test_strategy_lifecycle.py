@@ -10,25 +10,18 @@ from src.algo_trading.adapters.models import StrategyStatusEnum
 
 
 
-async def test_complete_strategy_lifecycle(client, config, mongo_connection):
+async def test_complete_strategy_lifecycle(client, config, mongo_connection, mock_auth):
     """
     Integration test for complete strategy lifecycle workflow.
-
-    Steps:
-    1. Create strategy (INACTIVE)
-    2. Start strategy (ACTIVE)
-    3. Pause strategy (PAUSED)
-    4. Resume strategy (ACTIVE)
-    5. Stop strategy (STOPPED)
     """
-    # Step 1: Create strategy
+    user_id = mock_auth
     strategy_data = {
         'name': 'Lifecycle Test Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -41,7 +34,7 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -54,7 +47,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         strategy_id = created['strategy_id']
         assert created['status'] == StrategyStatusEnum.INACTIVE.value
 
-    # Step 2: Start strategy
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token'},
@@ -63,7 +55,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         started = await response.json()
         assert started['status'] == StrategyStatusEnum.ACTIVE.value
 
-    # Step 3: Pause strategy
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/pause',
         headers={'Authorization': 'Bearer test-token'},
@@ -72,7 +63,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         paused = await response.json()
         assert paused['status'] == StrategyStatusEnum.PAUSED.value
 
-    # Verify strategy is paused
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token'},
@@ -81,7 +71,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         status = await response.json()
         assert status['status'] == StrategyStatusEnum.PAUSED.value
 
-    # Step 4: Resume strategy (start from paused)
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token'},
@@ -90,7 +79,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         resumed = await response.json()
         assert resumed['status'] == StrategyStatusEnum.ACTIVE.value
 
-    # Step 5: Stop strategy (emergency stop)
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/stop',
         headers={'Authorization': 'Bearer test-token'},
@@ -99,7 +87,6 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
         stopped = await response.json()
         assert stopped['status'] == StrategyStatusEnum.STOPPED.value
 
-    # Verify final state
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token'},
@@ -110,20 +97,20 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection):
 
 
 
-async def test_invalid_state_transitions(client, config, mongo_connection):
+async def test_invalid_state_transitions(client, config, mongo_connection, mock_auth):
     """
     Test that invalid state transitions are rejected.
 
     Validates state machine enforcement.
     """
-    # Create strategy
+    user_id = mock_auth
     strategy_data = {
         'name': 'Invalid Transition Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -136,7 +123,7 @@ async def test_invalid_state_transitions(client, config, mongo_connection):
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -148,30 +135,28 @@ async def test_invalid_state_transitions(client, config, mongo_connection):
         created = await response.json()
         strategy_id = created['strategy_id']
 
-    # Try to pause inactive strategy (should fail)
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/pause',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        # Should fail with conflict or bad request
-        assert response.status in [HTTPStatus.CONFLICT, HTTPStatus.BAD_REQUEST]
+        assert response.status == HTTPStatus.CONFLICT
 
 
 
-async def test_strategy_deletion(client, config, mongo_connection):
+async def test_strategy_deletion(client, config, mongo_connection, mock_auth):
     """
     Test strategy deletion workflow.
 
     Validates cleanup and resource management.
     """
-    # Create strategy
+    user_id = mock_auth
     strategy_data = {
         'name': 'Delete Test Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -184,7 +169,7 @@ async def test_strategy_deletion(client, config, mongo_connection):
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -196,14 +181,12 @@ async def test_strategy_deletion(client, config, mongo_connection):
         created = await response.json()
         strategy_id = created['strategy_id']
 
-    # Delete strategy
     async with client.delete(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.NO_CONTENT
 
-    # Verify strategy is deleted
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token'},

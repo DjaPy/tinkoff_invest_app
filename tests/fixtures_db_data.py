@@ -117,9 +117,8 @@ def _generate_parameters_for_strategy(
 @pytest.fixture
 def create_trading_sessions(get_session, fake, pydantic_generator_data) -> Callable:
     async def _inner(**kwargs) -> TradingSessionDocument:
-        # Generate defaults
         session_start = kwargs.pop('session_start', datetime.now(tz=UTC))
-        session_end = kwargs.pop('session_end', session_start + timedelta(hours=8))  # 8 hour session
+        session_end = kwargs.pop('session_end', session_start + timedelta(hours=8))
 
         starting_capital = kwargs.pop('starting_capital', Decimal('100000.00'))
         ending_capital = kwargs.pop(
@@ -187,8 +186,12 @@ def create_order(get_session, fake, pydantic_generator_data) -> Callable:
 @pytest.fixture
 def create_position(get_session, fake, pydantic_generator_data) -> Callable:
     async def _inner(**kwargs) -> PortfolioPositionDocument:
-        average_price = kwargs.pop('average_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))))
-        current_price = kwargs.pop('current_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))))
+        average_price = kwargs.pop(
+            'average_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))),
+        )
+        current_price = kwargs.pop(
+            'current_price', Decimal(str(fake.pyfloat(min_value=100, max_value=500, right_digits=2))),
+        )
 
         position = PortfolioPositionDocument(
             position_id=kwargs.pop('position_id', uuid.uuid4()),

@@ -93,7 +93,9 @@ async def test_put_strategy_partial_update(client, config, mock_auth, create_tra
 
 
 @pytest.mark.asyncio
-async def test_put_strategy_validates_risk_controls(client, config, mongo_connection, mock_auth, create_trading_strategy):
+async def test_put_strategy_validates_risk_controls(
+        client, config, mongo_connection, mock_auth, create_trading_strategy,
+):
     """Test PUT /api/v1/strategies/{strategy_id} validates risk control constraints"""
     strategy = await create_trading_strategy()
 

@@ -4,30 +4,33 @@ Validates user story: Monitor real-time strategy performance and analyze
 historical results.
 """
 
+from datetime import datetime, timedelta, UTC
+from decimal import Decimal
 from http import HTTPStatus
 
+from src.algo_trading.enums import OrderSideEnum
 
 
-
-async def test_performance_monitoring_and_analytics(client, config, mongo_connection):
+async def test_performance_monitoring_and_analytics(
+    client,
+    config,
+    mongo_connection,
+    mock_auth,
+    create_trading_sessions,
+    create_order,
+):
     """
     Integration test for performance monitoring workflow.
-
-    Steps:
-    1. Create and start a strategy
-    2. Get real-time performance metrics
-    3. View trade analytics
-    4. Check drawdown analysis
-    5. Get portfolio summary
     """
-    # Step 1: Create and start strategy
+    user_id = mock_auth
+
     strategy_data = {
         'name': 'Performance Monitoring Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL,MSFT,GOOGL',
+            'instruments': ['AAPL', 'MSFT', 'GOOGL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -40,7 +43,7 @@ async def test_performance_monitoring_and_analytics(client, config, mongo_connec
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -48,76 +51,115 @@ async def test_performance_monitoring_and_analytics(client, config, mongo_connec
         json=strategy_data,
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        assert response.status == HTTPStatus.CREATED
         created = await response.json()
+        assert response.status == HTTPStatus.CREATED
         strategy_id = created['strategy_id']
 
-    # Start strategy
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
 
-    # Step 2: Get real-time performance metrics
+    session_start = datetime.now(tz=UTC) - timedelta(days=25)
+    session_end = datetime.now(tz=UTC) - timedelta(hours=1)
+
+    trading_session = await create_trading_sessions(
+        strategy_id=strategy_id,
+        session_start=session_start,
+        session_end=session_end,
+        starting_capital=Decimal('50000.00'),
+        ending_capital=Decimal('51500.00'),
+    )
+
+    prices = [150, 152, 148, 155, 147, 153, 149, 156, 151, 154,
+              148, 157, 150, 152, 149, 155, 151, 153, 150, 154]
+
+
+    day_counter = 1
+    for i in range(0, len(prices) - 1, 2):
+        await create_order(
+            strategy_id=strategy_id,
+            session_id=trading_session.session_id,
+            side=OrderSideEnum.BUY,
+            filled_at=session_start + timedelta(days=day_counter),
+            quantity=Decimal('10'),
+            filled_quantity=Decimal('10'),
+            filled_price=Decimal(str(prices[i])),
+        )
+        day_counter += 1
+
+        await create_order(
+            strategy_id=strategy_id,
+            session_id=trading_session.session_id,
+            side=OrderSideEnum.SELL,
+            filled_at=session_start + timedelta(days=day_counter),
+            quantity=Decimal('10'),
+            filled_quantity=Decimal('10'),
+            filled_price=Decimal(str(prices[i + 1])),
+        )
+        day_counter += 1
+
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=1d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=1m',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        assert response.status == HTTPStatus.OK
         performance = await response.json()
+        assert response.status == HTTPStatus.OK
 
-        # Verify performance metrics structure
+
         assert 'total_return' in performance or 'metrics' in performance
 
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/trades?period=1d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/trades?period=1m',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
-        trades = await response.json()
+        trade_analytics = await response.json()
 
-        # Verify trade analytics structure
-        assert 'trades' in trades or isinstance(trades, list)
+        assert 'total_trades' in trade_analytics
+        assert 'winning_trades' in trade_analytics
+        assert 'avg_win' in trade_analytics
 
-    # Step 4: Check drawdown analysis
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/drawdown?period=7d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/drawdown?period=1m',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
         drawdown = await response.json()
 
-        # Verify drawdown analysis structure
         assert 'max_drawdown' in drawdown or 'drawdown' in drawdown
 
-    # Step 5: Get portfolio summary
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/portfolio/summary?period=1d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/portfolio/summary?period=1m',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
         summary = await response.json()
 
-        # Verify portfolio summary structure
         assert 'total_value' in summary or 'portfolio' in summary or 'summary' in summary
 
 
 
-async def test_performance_metrics_for_inactive_strategy(client, config, mongo_connection):
+async def test_performance_metrics_for_inactive_strategy(
+        client,
+        config,
+        mongo_connection,
+        mock_auth,
+        create_trading_sessions,
+):
     """
     Test performance metrics for strategy that hasn't executed any trades.
 
     Validates graceful handling of empty performance data.
     """
-    # Create strategy but don't start it
     strategy_data = {
         'name': 'Inactive Performance Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -138,14 +180,25 @@ async def test_performance_metrics_for_inactive_strategy(client, config, mongo_c
         json=strategy_data,
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        assert response.status == HTTPStatus.CREATED
         created = await response.json()
+        assert response.status == HTTPStatus.CREATED
         strategy_id = created['strategy_id']
 
-    # Get performance metrics for inactive strategy
+    session_start = datetime.now(tz=UTC) - timedelta(days=25)
+    session_end = datetime.now(tz=UTC) + timedelta(days=3)
+
+    trading_session = await create_trading_sessions(
+        strategy_id=strategy_id,
+        session_start=session_start,
+        session_end=session_end,
+        starting_capital=Decimal('50000.00'),
+        ending_capital=Decimal('51500.00'),
+    )
+
     async with client.get(
-        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=1d',
+        url=f'http://127.0.0.1:{config.http.port}/api/v1/analytics/strategies/{strategy_id}/performance?period=1m',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
-        # Should return OK with empty or zero metrics
+        data = await response.json()
         assert response.status == HTTPStatus.OK
+        assert data

@@ -86,7 +86,9 @@ async def test_start_strategy_unauthorized(client, config):
 
 
 @pytest.mark.asyncio
-async def test_stop_strategy_halts_active_strategy(client, config, mongo_connection, mock_auth, create_trading_strategy):
+async def test_stop_strategy_halts_active_strategy(
+        client, config, mongo_connection, mock_auth, create_trading_strategy,
+):
     """Test POST /api/v1/strategies/{strategy_id}/stop halts a running strategy"""
     strategy = await create_trading_strategy(status=StrategyStatusEnum.ACTIVE)
 
@@ -195,9 +197,9 @@ async def test_pause_strategy_keeps_positions_open(
 
 
         positions = await PortfolioPositionDocument.find(
-            PortfolioPositionDocument.strategy_id == strategy.strategy_id
+            PortfolioPositionDocument.strategy_id == strategy.strategy_id,
         ).to_list()
-    
+
         assert len(positions) == 2
         assert position1.position_id in {p.position_id for p in positions}
         assert position2.position_id in {p.position_id for p in positions}

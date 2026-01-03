@@ -18,7 +18,6 @@ async def test_mongo_db(fake, get_session, pydantic_generator_data):
         created_at=datetime.now(tz=ZoneInfo('utc')),
         updated_at=datetime.now(tz=ZoneInfo('utc')),
     )
-    session = get_session
-    sandbox_db = await sandbox.save(session=session)
+    sandbox_db = await sandbox.save()
     assert sandbox_db.id
     assert isinstance(sandbox, SandboxAccount)

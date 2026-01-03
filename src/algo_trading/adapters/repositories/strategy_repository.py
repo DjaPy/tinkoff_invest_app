@@ -7,7 +7,17 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
-from src.algo_trading.adapters.models import StrategyStatusEnum, TradingStrategyDocument
+from src.algo_trading.ports.api.v1.schemas.strategies_schema import UpdateStrategyRequestSchema
+from src.algo_trading.adapters.models import (
+    RiskControls,
+    StrategyStatusEnum,
+    StrategyTypeEnum,
+    TradingStrategyDocument,
+)
+
+
+class InvalidStateTransitionError(Exception):
+    """Raised when strategy state transition is invalid."""
 
 
 class StrategyRepository:
@@ -28,6 +38,42 @@ class StrategyRepository:
         Returns:
             Saved strategy with generated ID
         """
+        await strategy.insert()
+        return strategy
+
+    @staticmethod
+    async def create_from_request(
+        name: str,
+        strategy_type: StrategyTypeEnum,
+        parameters: dict[str, Any],
+        risk_controls: RiskControls,
+        created_by: UUID,
+    ) -> TradingStrategyDocument:
+        """
+        Create a new trading strategy from API request data.
+
+        This method encapsulates the logic of creating a TradingStrategyDocument
+        from raw request data, following the Repository pattern.
+
+        Args:
+            name: Strategy name
+            strategy_type: Type of trading strategy
+            parameters: Strategy-specific parameters
+            risk_controls: Risk management configuration
+            created_by: User ID who created the strategy
+
+        Returns:
+            Saved strategy with generated ID
+        """
+
+        strategy = TradingStrategyDocument(
+            name=name,
+            strategy_type=strategy_type,
+            parameters=parameters,
+            risk_controls=risk_controls,
+            created_by=created_by,
+        )
+
         await strategy.insert()
         return strategy
 
@@ -111,7 +157,7 @@ class StrategyRepository:
     @staticmethod
     async def update_strategy(
         strategy_id: UUID,
-        update_data: dict[str, Any],
+        update_data: UpdateStrategyRequestSchema,
     ) -> TradingStrategyDocument | None:
         """
         Update strategy with partial data.
@@ -127,17 +173,15 @@ class StrategyRepository:
         if not strategy:
             return None
 
-        # Update only provided fields
-        if 'name' in update_data and update_data['name'] is not None:
-            strategy.name = update_data['name']
+        if update_data.name:
+            strategy.name = update_data.name
 
-        if 'parameters' in update_data and update_data['parameters'] is not None:
-            strategy.parameters = update_data['parameters']
+        if update_data.parameters:
+            strategy.parameters = update_data.parameters
 
-        if 'risk_controls' in update_data and update_data['risk_controls'] is not None:
-            strategy.risk_controls = update_data['risk_controls']
+        if update_data.risk_controls:
+            strategy.risk_controls = update_data.risk_controls
 
-        # Update timestamp
         strategy.updated_at = datetime.now(timezone.utc)
 
         await strategy.save()
@@ -195,3 +239,84 @@ class StrategyRepository:
             List of active strategies
         """
         return await StrategyRepository.find_all(created_by=created_by, status=StrategyStatusEnum.ACTIVE)
+
+    @staticmethod
+    async def pause_strategy(strategy_id: UUID) -> TradingStrategyDocument:
+        """
+        Pause strategy execution.
+
+        Args:
+            strategy_id: Strategy UUID
+
+        Returns:
+            Updated strategy with PAUSED status
+
+        Raises:
+            ValueError: If strategy not found
+            InvalidStateTransitionError: If status transition is invalid
+        """
+        strategy = await StrategyRepository.find_by_id(strategy_id)
+        if not strategy:
+            raise ValueError(f'Strategy {strategy_id} not found')
+
+        try:
+            strategy.update_status(StrategyStatusEnum.PAUSED)
+        except ValueError as e:
+            raise InvalidStateTransitionError(str(e)) from e
+
+        await strategy.save()
+        return strategy
+
+    @staticmethod
+    async def start_strategy(strategy_id: UUID) -> TradingStrategyDocument:
+        """
+        Start strategy execution.
+
+        Args:
+            strategy_id: Strategy UUID
+
+        Returns:
+            Updated strategy with ACTIVE status
+
+        Raises:
+            ValueError: If strategy not found
+            InvalidStateTransitionError: If status transition is invalid
+        """
+        strategy = await StrategyRepository.find_by_id(strategy_id)
+        if not strategy:
+            raise ValueError(f'Strategy {strategy_id} not found')
+
+        try:
+            strategy.update_status(StrategyStatusEnum.ACTIVE)
+        except ValueError as e:
+            raise InvalidStateTransitionError(str(e)) from e
+
+        await strategy.save()
+        return strategy
+
+    @staticmethod
+    async def stop_strategy(strategy_id: UUID) -> TradingStrategyDocument:
+        """
+        Stop strategy execution.
+
+        Args:
+            strategy_id: Strategy UUID
+
+        Returns:
+            Updated strategy with STOPPED status
+
+        Raises:
+            ValueError: If strategy not found
+            InvalidStateTransitionError: If status transition is invalid
+        """
+        strategy = await StrategyRepository.find_by_id(strategy_id)
+        if not strategy:
+            raise ValueError(f'Strategy {strategy_id} not found')
+
+        try:
+            strategy.update_status(StrategyStatusEnum.STOPPED)
+        except ValueError as e:
+            raise InvalidStateTransitionError(str(e)) from e
+
+        await strategy.save()
+        return strategy

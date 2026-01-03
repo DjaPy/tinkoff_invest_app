@@ -91,7 +91,25 @@ class PerformanceAnalytics:
         ).to_list()
 
         if not sessions:
-            raise PerformanceAnalyticsError(f'No trading sessions found for strategy {strategy_id} in period')
+            metrics = PerformanceMetricsDocument(
+                strategy_id=strategy_id,
+                period_start=period_start,
+                period_end=period_end,
+                total_return=Decimal('0'),
+                annualized_return=Decimal('0'),
+                sharpe_ratio=Decimal('0'),
+                max_drawdown=Decimal('0'),
+                volatility=Decimal('0'),
+                win_rate=Decimal('0'),
+                profit_factor=Decimal('0'),
+                trade_count=0,
+                average_win=Decimal('0'),
+                average_loss=Decimal('0'),
+                largest_win=Decimal('0'),
+                largest_loss=Decimal('0'),
+            )
+            await metrics.insert()
+            return metrics
 
         starting_capital = sessions[0].starting_capital
         ending_capital = sessions[-1].ending_capital or sessions[-1].starting_capital
@@ -105,7 +123,25 @@ class PerformanceAnalytics:
         ).to_list()
 
         if not orders:
-            raise PerformanceAnalyticsError('No filled orders found in period')
+            metrics = PerformanceMetricsDocument(
+                strategy_id=strategy_id,
+                period_start=period_start,
+                period_end=period_end,
+                total_return=Decimal('0'),
+                annualized_return=Decimal('0'),
+                sharpe_ratio=Decimal('0'),
+                max_drawdown=Decimal('0'),
+                volatility=Decimal('0'),
+                win_rate=Decimal('0'),
+                profit_factor=Decimal('0'),
+                trade_count=0,
+                average_win=Decimal('0'),
+                average_loss=Decimal('0'),
+                largest_win=Decimal('0'),
+                largest_loss=Decimal('0'),
+            )
+            await metrics.insert()
+            return metrics
 
         equity_curve, daily_returns = await self._build_equity_curve(orders, starting_capital)
 

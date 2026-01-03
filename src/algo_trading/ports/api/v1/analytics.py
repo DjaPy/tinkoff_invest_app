@@ -11,6 +11,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from src.algo_trading.ports.api.v1.schemas.metrics_schema import PerformanceMetricsResponseSchema
 from src.consts import TINKOFF_INVEST_SANDBOX
 from src.config import config
 from src.base.fastapi_service.problem import (
@@ -131,7 +132,7 @@ async def get_latest_metrics(
 
 @analytics_router.get(
     '/strategies/{strategy_id}/performance',
-    response_model=PerformanceMetricsDocument,
+    response_model=PerformanceMetricsResponseSchema,
     summary='Calculate strategy performance metrics',
     description='Calculate (or retrieve cached) performance analytics for a specific trading strategy',
 )
@@ -141,7 +142,7 @@ async def get_strategy_performance(
     from_date: datetime | None = Query(None, description='Start date for custom period'),
     to_date: datetime | None = Query(None, description='End date for custom period'),
     force_recalculate: bool = Query(False, description='Force recalculation bypassing cache'),
-) -> PerformanceMetricsDocument:
+) -> PerformanceMetricsResponseSchema:
     """
     Get strategy performance metrics.
 
@@ -170,12 +171,14 @@ async def get_strategy_performance(
             detail=f'not found strategy by id={strategy_id}',
         )
     perf_analytics = PerformanceAnalytics()
-    return await perf_analytics.calculate_strategy_performance(
+    metrics_doc = await perf_analytics.calculate_strategy_performance(
         strategy_id=strategy.strategy_id,
         period_start=from_date,
         period_end=to_date,
         force_recalculate=force_recalculate,
     )
+
+    return PerformanceMetricsResponseSchema.from_document(metrics_doc)
 
 
 @analytics_router.get(
@@ -319,7 +322,7 @@ async def get_market_data(
     limit: int = Query(100, ge=1, le=1000, description='Maximum number of data points to return'),
 ) -> MarketDataAnalyticsResponseSchema:
     """
-    Get market data analytics (T058).
+    Get market data analytics.
 
     Args:
         instrument: Trading instrument identifier (ticker/FIGI)

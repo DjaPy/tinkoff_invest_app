@@ -8,34 +8,36 @@ from http import HTTPStatus
 
 
 
-async def test_risk_controls_enforcement(client, config, mongo_connection):
+async def test_risk_controls_enforcement(client, config, mongo_connection, mock_auth):
     """
     Integration test for risk controls enforcement.
 
     Validates that risk limits are properly enforced during strategy execution.
     """
-    # Create strategy with strict risk controls
+
+    user_id = mock_auth
+
     strategy_data = {
         'name': 'Risk Control Test Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
-            'max_position_size': '200',  # Strict limit
-            'max_portfolio_value': '10000',  # Low limit
-            'stop_loss_percent': '0.02',  # Tight stop loss
-            'max_drawdown_percent': '0.05',  # Strict drawdown limit
-            'daily_loss_limit': '100',  # Low daily loss limit
-            'max_orders_per_day': 3,  # Very few orders allowed
+            'max_position_size': '200',
+            'max_portfolio_value': '10000',
+            'stop_loss_percent': '0.02',
+            'max_drawdown_percent': '0.05',
+            'daily_loss_limit': '100',
+            'max_orders_per_day': 3,
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
             'enabled': True,
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -47,14 +49,12 @@ async def test_risk_controls_enforcement(client, config, mongo_connection):
         created = await response.json()
         strategy_id = created['strategy_id']
 
-    # Start strategy - should succeed with risk controls
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
 
-    # Verify risk controls are active
     async with client.get(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}',
         headers={'Authorization': 'Bearer test-token'},
@@ -66,20 +66,20 @@ async def test_risk_controls_enforcement(client, config, mongo_connection):
 
 
 
-async def test_risk_controls_validation(client, config):
+async def test_risk_controls_validation(client, config, mongo_connection, mock_auth):
     """
     Test risk controls validation on strategy creation.
 
     Validates proper error handling for invalid risk parameters.
     """
-    # Invalid stop_loss_percent (> 1.0)
+    user_id = mock_auth
     invalid_strategy = {
         'name': 'Invalid Risk Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -92,7 +92,7 @@ async def test_risk_controls_validation(client, config):
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(
@@ -104,20 +104,20 @@ async def test_risk_controls_validation(client, config):
 
 
 
-async def test_update_risk_controls_on_running_strategy(client, config, mongo_connection):
+async def test_update_risk_controls_on_running_strategy(client, config, mongo_connection, mock_auth):
     """
     Test updating risk controls on a running strategy.
 
     Validates dynamic risk management.
     """
-    # Create and start strategy
+
     strategy_data = {
         'name': 'Dynamic Risk Strategy',
         'strategy_type': 'momentum',
         'parameters': {
             'lookback_period': '20',
             'momentum_threshold': '0.02',
-            'instruments': 'AAPL',
+            'instruments': ['AAPL'],
             'position_size': '100',
         },
         'risk_controls': {
@@ -142,19 +142,17 @@ async def test_update_risk_controls_on_running_strategy(client, config, mongo_co
         created = await response.json()
         strategy_id = created['strategy_id']
 
-    # Start strategy
     async with client.post(
         url=f'http://127.0.0.1:{config.http.port}/api/v1/strategies/{strategy_id}/start',
         headers={'Authorization': 'Bearer test-token'},
     ) as response:
         assert response.status == HTTPStatus.OK
 
-    # Update risk controls (tighten stop loss)
     updated_data = {
         'risk_controls': {
             'max_position_size': '1000',
             'max_portfolio_value': '50000',
-            'stop_loss_percent': '0.03',  # Tightened from 0.05
+            'stop_loss_percent': '0.03',
             'max_drawdown_percent': '0.10',
             'daily_loss_limit': '1000',
             'max_orders_per_day': 20,

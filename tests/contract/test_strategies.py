@@ -9,7 +9,6 @@ from decimal import Decimal
 
 from starlette import status
 
-from fixtures_db_data import create_risk_controls, create_trading_strategy
 from src.algo_trading.adapters.models.strategy import (
     MeanReversionParameters,
     MomentumParameters,

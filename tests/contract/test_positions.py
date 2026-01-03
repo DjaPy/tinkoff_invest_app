@@ -158,7 +158,9 @@ async def test_get_positions_unauthorized(client, config):
 
 
 @pytest.mark.asyncio
-async def test_get_position_by_id_returns_position_details(client, config, mongo_connection, mock_auth, create_position):
+async def test_get_position_by_id_returns_position_details(
+        client, config, mongo_connection, mock_auth, create_position,
+):
     """Test GET /api/v1/positions/{position_id} returns position details"""
     created_position = await create_position()
     position_id = created_position.position_id

@@ -1,4 +1,5 @@
 """Beanie ODM Models for Algorithmic Trading - Hexagonal Architecture Adapters."""
+from src.sandbox.collections import SandboxAccount
 from src.algo_trading.enums import (
     OrderSideEnum,
     OrderStatusEnum,
@@ -28,6 +29,7 @@ BEANIE_MODELS = [
     PortfolioPositionDocument,
     PerformanceMetricsDocument,
     TradingSessionDocument,
+    SandboxAccount,
 ]
 __all__ = [
     'ArbitrageParameters',

@@ -90,7 +90,9 @@ class TradingStrategyDocument(Document):
     )
     risk_controls: RiskControls = Field(description='Risk management configuration')
     created_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Creation timestamp')
-    updated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp')
+    updated_at: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp',
+    )
     created_by: UUID = Field(description='User identifier')
 
     @field_validator('parameters', mode='before')

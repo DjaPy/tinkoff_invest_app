@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from uuid import UUID
 
 
@@ -6,7 +6,8 @@ from uuid import UUID
 class UserData:
     username: str
     hashed_password: str
+    user_id: UUID
     email: str | None = None
     full_name: str | None = None
     disabled: bool | None = True
-    user_id: UUID | None = field(default=None)
+

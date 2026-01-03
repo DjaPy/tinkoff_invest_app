@@ -6,6 +6,8 @@ Orchestrates portfolio-level analytics across multiple strategies.
 from decimal import Decimal
 from datetime import datetime
 
+from beanie.operators import In
+
 from src.algo_trading.enums import OrderSideEnum
 from src.algo_trading.adapters.models import (
     TradingStrategyDocument,
@@ -58,7 +60,7 @@ class PortfolioAnalytics:
         strategy_ids = [s.strategy_id for s in strategies]
 
         orders = await TradeOrderDocument.find(
-            TradeOrderDocument.strategy_id.in_(strategy_ids),  # type: ignore[attr-defined]
+            In(TradeOrderDocument.strategy_id, strategy_ids),
             TradeOrderDocument.status == OrderStatusEnum.FILLED,
             TradeOrderDocument.filled_at != None,  # noqa: E711
             TradeOrderDocument.filled_at >= period_start,  # type: ignore[operator]

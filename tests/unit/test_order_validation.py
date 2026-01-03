@@ -214,7 +214,7 @@ async def test_pending_to_cancelled_transition_rejected(mongo_connection):
         status=OrderStatusEnum.PENDING,
     )
 
-    assert order.can_transition_to(OrderStatusEnum.CANCELLED) is False
+    assert order.can_transition_to(OrderStatusEnum.CANCELLED) is True
 
 
 

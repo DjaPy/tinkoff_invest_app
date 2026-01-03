@@ -7,12 +7,11 @@ It should FAIL until the actual endpoint implementation is complete.
 Following TDD approach - tests written before implementation.
 """
 
-import pytest
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 from starlette import status
 
-from algo_trading.ports.api.v1.schemas.strategies_schema import TradingStrategyResponseSchema
-from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, StrategyTypeEnum, TradingStrategyDocument
+from src.algo_trading.ports.api.v1.schemas.strategies_schema import TradingStrategyResponseSchema
+from src.algo_trading.adapters.models.strategy import StrategyStatusEnum, StrategyTypeEnum
 
 
 class StrategyListResponse(BaseModel):
@@ -115,7 +114,9 @@ async def test_get_strategies_unauthorized_without_token(client, config):
 
 
 
-async def test_get_strategies_validates_pydantic_model(client, config, mongo_connection, mock_auth, create_trading_strategy):
+async def test_get_strategies_validates_pydantic_model(
+        client, config, mongo_connection, mock_auth, create_trading_strategy,
+):
     """Test GET /api/v1/strategies response validates against Pydantic model"""
 
     user_id = mock_auth

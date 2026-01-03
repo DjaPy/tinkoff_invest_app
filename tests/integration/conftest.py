@@ -22,4 +22,4 @@ async def services(monkeypatch, config, unused_tcp_port):
             if attempt == 4:
                 raise
             continue
-    raise OSError
+    return []

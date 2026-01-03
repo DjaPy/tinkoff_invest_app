@@ -5,14 +5,16 @@ REST API endpoints for managing trading strategies.
 Following FastAPI patterns and RFC7807 error handling.
 """
 
-from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from src.users.adapters.dto_models.users import UserData
 from src.users.services.auth import get_current_active_user
-from src.algo_trading.adapters.repositories.strategy_repository import StrategyRepository
+from src.algo_trading.adapters.repositories.strategy_repository import (
+    InvalidStateTransitionError,
+    StrategyRepository,
+)
 from src.algo_trading.enums import StrategyStatusEnum
 from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
@@ -31,7 +33,7 @@ strategies_router = APIRouter(
 
 @strategies_router.post(
     '/',
-    response_model=TradingStrategyDocument,
+    response_model=TradingStrategyResponseSchema,
     status_code=status.HTTP_201_CREATED,
     summary='Create new trading strategy',
     description='Create a new algorithmic trading strategy with configuration and risk controls',
@@ -39,7 +41,7 @@ strategies_router = APIRouter(
 async def create_strategy(
     request: CreateStrategyRequestSchema,
     current_user: UserData = Depends(get_current_active_user),
-) -> TradingStrategyDocument:
+) -> TradingStrategyResponseSchema:
     """
     Create a new trading strategy (T042).
 
@@ -54,7 +56,7 @@ async def create_strategy(
         HTTPException 422: Validation error in request data
         HTTPException 500: Internal server error
     """
-    strategy = TradingStrategyDocument(
+    strategy = await StrategyRepository.create_from_request(
         name=request.name,
         strategy_type=request.strategy_type,
         parameters=request.parameters,
@@ -62,7 +64,7 @@ async def create_strategy(
         created_by=current_user.user_id,
     )
 
-    return await StrategyRepository.create(strategy)
+    return TradingStrategyResponseSchema.from_document(strategy)
 
 
 @strategies_router.get(
@@ -111,10 +113,13 @@ async def get_strategy(strategy_id: UUID) -> TradingStrategyDocument:
         HTTPException 404: Strategy not found
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
+    strategy = await StrategyRepository.find_by_id(strategy_id)
 
     if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        )
 
     return strategy
 
@@ -141,16 +146,17 @@ async def update_strategy(strategy_id: UUID, body: UpdateStrategyRequestSchema) 
         HTTPException 422: Validation error in request data
         HTTPException 500: Internal server error
     """
-    # Use repository layer for update
     strategy = await StrategyRepository.update_strategy(
         strategy_id=strategy_id,
-        update_data=body.model_dump(exclude_none=True),
+        update_data=body,
     )
 
     if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        )
 
-    # Convert domain model to response schema
     return TradingStrategyResponseSchema.from_document(strategy)
 
 
@@ -172,18 +178,21 @@ async def delete_strategy(strategy_id: UUID) -> None:
         HTTPException 409: Cannot delete active strategy
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
+    strategy = await StrategyRepository.find_by_id(strategy_id)
 
     if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        ) from None
 
     if strategy.status == StrategyStatusEnum.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail='Cannot delete active strategy. Stop the strategy first.',
-        )
+        ) from None
 
-    await StrategyRepository.delete(strategy)
+    await StrategyRepository.delete(strategy_id)
 
 
 @strategies_router.post(
@@ -207,20 +216,15 @@ async def start_strategy(strategy_id: UUID) -> TradingStrategyDocument:
         HTTPException 409: Invalid state transition
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
-
-    if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
-
-    # Validate state transition
     try:
-        strategy.update_status(StrategyStatusEnum.ACTIVE)
-    except ValueError as e:
+        return await StrategyRepository.start_strategy(strategy_id)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        ) from err
+    except InvalidStateTransitionError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
-
-    await strategy.save()
-
-    return strategy
 
 
 @strategies_router.post(
@@ -241,17 +245,18 @@ async def stop_strategy(strategy_id: UUID) -> TradingStrategyDocument:
 
     Raises:
         HTTPException 404: Strategy not found
+        HTTPException 409: Invalid state transition
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
-
-    if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
-
-    strategy.update_status(StrategyStatusEnum.STOPPED)
-    await strategy.save()
-
-    return strategy
+    try:
+        return await StrategyRepository.stop_strategy(strategy_id)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        ) from err
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 
 @strategies_router.post(
@@ -272,14 +277,15 @@ async def pause_strategy(strategy_id: UUID) -> TradingStrategyDocument:
 
     Raises:
         HTTPException 404: Strategy not found
+        HTTPException 409: Invalid state transition
         HTTPException 500: Internal server error
     """
-    strategy = await TradingStrategyDocument.find_one(TradingStrategyDocument.strategy_id == strategy_id)
-
-    if not strategy:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f'Strategy {strategy_id} not found')
-
-    strategy.update_status(StrategyStatusEnum.PAUSED)
-    await strategy.save()
-
-    return strategy
+    try:
+        return await StrategyRepository.pause_strategy(strategy_id)
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        ) from err
+    except InvalidStateTransitionError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e

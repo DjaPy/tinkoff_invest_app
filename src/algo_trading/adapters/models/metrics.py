@@ -42,7 +42,9 @@ class PerformanceMetricsDocument(Document):
     largest_win: DecimalField = Field(default=Decimal('0'), description='Largest winning trade')
     largest_loss: DecimalField = Field(default=Decimal('0'), description='Largest losing trade')
 
-    calculated_at: datetime = Field(default_factory=partial(datetime.now, timezone.utc), description='Calculation timestamp')
+    calculated_at: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc), description='Calculation timestamp',
+    )
 
     @field_validator('period_end', mode='after')
     @classmethod
