@@ -2,7 +2,13 @@ import asyncio
 
 from aiomisc import entrypoint
 
-from src.algo_trading.ports.api.v1 import analytics_router, orders_router, positions_router, strategies_router
+from src.algo_trading.ports.api.v1 import (
+    analytics_router,
+    orders_router,
+    positions_router,
+    strategies_router,
+)
+from src.algo_trading.ports.api.v1.tinkoff_accounts import tinkoff_accounts_router
 from src.algo_trading.services.scheduled_metrics import ScheduledMetricsService
 from src.base.fastapi_service import FastAPIService
 from src.base.mongo_service.service import MongoDBService
@@ -23,6 +29,7 @@ fastapi_service = FastAPIService(
         orders_router,
         positions_router,
         strategies_router,
+        tinkoff_accounts_router,
         auth_router,
         users_router,
     ],

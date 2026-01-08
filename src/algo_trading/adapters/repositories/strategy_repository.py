@@ -7,6 +7,10 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID
 
+from src.algo_trading.adapters.models.strategy import (
+    TinkoffAccountDocument,
+    TinkoffAccountType,
+)
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import UpdateStrategyRequestSchema
 from src.algo_trading.adapters.models import (
     RiskControls,
@@ -48,6 +52,7 @@ class StrategyRepository:
         parameters: dict[str, Any],
         risk_controls: RiskControls,
         created_by: UUID,
+        tinkoff_account_type: TinkoffAccountType,
     ) -> TradingStrategyDocument:
         """
         Create a new trading strategy from API request data.
@@ -61,10 +66,21 @@ class StrategyRepository:
             parameters: Strategy-specific parameters
             risk_controls: Risk management configuration
             created_by: User ID who created the strategy
+            tinkoff_account_type: Tinkoff account type
 
         Returns:
             Saved strategy with generated ID
+
+        Raises:
+            ValueError: If no default account found for account type
         """
+        tinkoff_account = await TinkoffAccountDocument.find_one(
+            TinkoffAccountDocument.user_id == created_by,
+            TinkoffAccountDocument.account_type == tinkoff_account_type,
+            TinkoffAccountDocument.is_default == True,  # noqa: E712
+        )
+        if not tinkoff_account:
+            raise ValueError(f'No default {tinkoff_account_type.value} account found for user')
 
         strategy = TradingStrategyDocument(
             name=name,
@@ -72,6 +88,7 @@ class StrategyRepository:
             parameters=parameters,
             risk_controls=risk_controls,
             created_by=created_by,
+            tinkoff_account=tinkoff_account,
         )
 
         await strategy.insert()
@@ -320,3 +337,41 @@ class StrategyRepository:
 
         await strategy.save()
         return strategy
+
+    @staticmethod
+    async def clone_to_sandbox(
+        strategy_id: UUID,
+        sandbox_account: TinkoffAccountDocument,
+    ) -> TradingStrategyDocument:
+        """
+        Clone existing strategy to sandbox account.
+
+        Creates a copy of the strategy with same parameters but linked
+        to sandbox account for safe testing. Status is reset to INACTIVE.
+
+        Args:
+            strategy_id: Source strategy UUID
+            sandbox_account: TinkoffAccountDocument
+
+        Returns:
+            Cloned strategy with new UUID and sandbox account
+
+        Raises:
+            ValueError: If strategy not found
+        """
+        source_strategy = await StrategyRepository.find_by_id(strategy_id)
+        if not source_strategy:
+            raise ValueError(f'Strategy {strategy_id} not found')
+
+        cloned_strategy = TradingStrategyDocument(
+            name=f'{source_strategy.name} (Sandbox Clone)',
+            strategy_type=source_strategy.strategy_type,
+            status=StrategyStatusEnum.INACTIVE,
+            parameters=source_strategy.parameters,
+            risk_controls=source_strategy.risk_controls,
+            created_by=source_strategy.created_by,
+            tinkoff_account=sandbox_account,
+        )
+
+        await cloned_strategy.insert()
+        return cloned_strategy

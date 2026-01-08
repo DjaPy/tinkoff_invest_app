@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
@@ -10,6 +11,7 @@ from src.algo_trading.adapters.models import (
     MomentumParameters,
 )
 from src.algo_trading.adapters.models import RiskControls, StrategyStatusEnum, StrategyTypeEnum, TradingStrategyDocument
+from src.algo_trading.adapters.models.strategy import TinkoffAccountType
 
 StrategyParameters = MomentumParameters | MeanReversionParameters |ArbitrageParameters | MarketMakingParameters
 
@@ -18,7 +20,11 @@ class CreateStrategyRequestSchema(BaseModel):
 
     name: str = Field(min_length=1, max_length=100, description='Strategy name')
     strategy_type: StrategyTypeEnum = Field(description='Type of trading strategy')
-    parameters: dict = Field(description='Strategy-specific parameters')
+    tinkoff_account_type: TinkoffAccountType = Field(
+        default=TinkoffAccountType.SANDBOX,
+        description='Tinkoff account type',
+    )
+    parameters: dict[str, Any] = Field(description='Strategy-specific parameters')
     risk_controls: RiskControls = Field(description='Risk management configuration')
 
 

@@ -6,6 +6,7 @@ from typing import Any, Callable
 
 import pytest
 
+from src.algo_trading.adapters.models import TinkoffAccountDocument, TinkoffAccountType
 from src.algo_trading.enums import OrderSideEnum, OrderStatusEnum, OrderTypeEnum
 from src.algo_trading.adapters.models import (
     ArbitrageParameters,
@@ -23,7 +24,22 @@ from src.algo_trading.adapters.models import (
 
 
 @pytest.fixture
-def create_risk_controls(get_session, fake, pydantic_generator_data) -> Callable:
+async def create_tinkoff_account(get_session, fake) -> Callable:
+    async def _inner(**kwargs) -> TinkoffAccountDocument:
+        tinkoff_account = TinkoffAccountDocument(
+            account_id=kwargs.pop('account_id', str(uuid.uuid4())),
+            name=kwargs.pop('name', fake.name()),
+            account_type=kwargs.pop('account_type', fake.random.choice(list(TinkoffAccountType))),
+            user_id=kwargs.pop('user_id', uuid.uuid4()),
+            is_default=kwargs.pop('is_default', True),
+            initial_balance=10000 )
+        await tinkoff_account.insert()
+        return tinkoff_account
+    return _inner
+
+
+@pytest.fixture
+def create_risk_controls(get_session, fake) -> Callable:
     def _inner(**kwargs: dict[str, Any]) -> RiskControls:
 
         return RiskControls(
@@ -52,12 +68,13 @@ def create_risk_controls(get_session, fake, pydantic_generator_data) -> Callable
 
 
 @pytest.fixture
-def create_trading_strategy(get_session, fake, pydantic_generator_data, create_risk_controls) -> Callable:
+def create_trading_strategy(get_session, fake, create_risk_controls, create_tinkoff_account) -> Callable:
     async def _inner(**kwargs: dict[str, Any]) -> TradingStrategyDocument:
         if not (risk_controls := kwargs.pop('risk_controls', None)):
             risk_controls = create_risk_controls()
 
         strategy_type = kwargs.pop('strategy_type', fake.random.choice(list(StrategyTypeEnum)))
+        tinkoff_account = await create_tinkoff_account()
 
         if not (parameters := kwargs.pop('parameters', None)):
             parameters = _generate_parameters_for_strategy(strategy_type, fake)
@@ -69,6 +86,7 @@ def create_trading_strategy(get_session, fake, pydantic_generator_data, create_r
             status=kwargs.pop('status', fake.random.choice(list(StrategyStatusEnum))),
             parameters=parameters,
             risk_controls=risk_controls,
+            tinkoff_account=tinkoff_account,
             created_at=kwargs.pop('created_at', datetime.now(tz=UTC)),
             updated_at=kwargs.pop('updated_at', datetime.now(tz=UTC)),
             created_by=kwargs.pop('created_by', uuid.uuid4()),

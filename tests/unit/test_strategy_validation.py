@@ -19,14 +19,17 @@ from src.algo_trading.adapters.models.strategy import (
     MeanReversionParameters,
     MomentumParameters,
     RiskControls,
+    TinkoffAccountType,
     TradingStrategyDocument,
 )
 from src.algo_trading.enums import StrategyStatusEnum, StrategyTypeEnum
 
 
-
-async def test_inactive_to_active_transition_allowed():
+async def test_inactive_to_active_transition_allowed(create_tinkoff_account):
     """Test INACTIVE → ACTIVE transition is allowed."""
+
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -47,7 +50,8 @@ async def test_inactive_to_active_transition_allowed():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.can_transition_to(StrategyStatusEnum.ACTIVE) is True
@@ -56,9 +60,10 @@ async def test_inactive_to_active_transition_allowed():
     assert strategy.status == StrategyStatusEnum.ACTIVE
 
 
-
-async def test_active_to_paused_transition_allowed():
+async def test_active_to_paused_transition_allowed(create_tinkoff_account):
     """Test ACTIVE → PAUSED transition is allowed."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -79,15 +84,17 @@ async def test_active_to_paused_transition_allowed():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.can_transition_to(StrategyStatusEnum.PAUSED) is True
 
 
-
-async def test_inactive_to_paused_transition_rejected():
+async def test_inactive_to_paused_transition_rejected(create_tinkoff_account):
     """Test INACTIVE → PAUSED transition is rejected."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -108,7 +115,8 @@ async def test_inactive_to_paused_transition_rejected():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.can_transition_to(StrategyStatusEnum.PAUSED) is False
@@ -119,9 +127,10 @@ async def test_inactive_to_paused_transition_rejected():
     assert 'Invalid status transition' in str(exc_info.value)
 
 
-
-async def test_active_to_inactive_transition_rejected():
+async def test_active_to_inactive_transition_rejected(create_tinkoff_account):
     """Test ACTIVE → INACTIVE transition is rejected."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -142,15 +151,17 @@ async def test_active_to_inactive_transition_rejected():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.can_transition_to(StrategyStatusEnum.INACTIVE) is False
 
 
-
-async def test_error_to_inactive_transition_allowed():
+async def test_error_to_inactive_transition_allowed(create_tinkoff_account):
     """Test ERROR → INACTIVE transition is allowed."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -171,18 +182,17 @@ async def test_error_to_inactive_transition_allowed():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.can_transition_to(StrategyStatusEnum.INACTIVE) is True
 
 
-# ==================== PARAMETER TYPE VALIDATION ====================
-
-
-
-async def test_momentum_strategy_validates_parameter_type():
+async def test_momentum_strategy_validates_parameter_type(create_tinkoff_account):
     """Test Momentum strategy accepts correct parameter type."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Momentum Strategy',
         strategy_type=StrategyTypeEnum.MOMENTUM,
@@ -202,16 +212,18 @@ async def test_momentum_strategy_validates_parameter_type():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.strategy_type == StrategyTypeEnum.MOMENTUM
     assert isinstance(strategy.parameters, MomentumParameters)
 
 
-
-async def test_mean_reversion_strategy_validates_parameter_type():
+async def test_mean_reversion_strategy_validates_parameter_type(create_tinkoff_account):
     """Test Mean Reversion strategy accepts correct parameter type."""
+    user_id = uuid4()
+    tinkoff_account = await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy = TradingStrategyDocument(
         name='Test Mean Reversion Strategy',
         strategy_type=StrategyTypeEnum.MEAN_REVERSION,
@@ -230,12 +242,12 @@ async def test_mean_reversion_strategy_validates_parameter_type():
             trading_hours_start='09:30:00',
             trading_hours_end='16:00:00',
         ),
-        created_by=uuid4(),
+        created_by=user_id,
+        tinkoff_account=tinkoff_account,
     )
 
     assert strategy.strategy_type == StrategyTypeEnum.MEAN_REVERSION
     assert isinstance(strategy.parameters, MeanReversionParameters)
-
 
 
 async def test_empty_strategy_name_rejected():
@@ -264,8 +276,7 @@ async def test_empty_strategy_name_rejected():
         )
 
 
-
-async def test_strategy_name_too_long_rejected():
+async def test_strategy_name_too_long_rejected(create_tinkoff_account):
     """Test strategy name exceeding 200 chars raises validation error."""
     with pytest.raises(ValidationError):
         TradingStrategyDocument(

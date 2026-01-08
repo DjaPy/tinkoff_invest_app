@@ -1,6 +1,7 @@
 """Tinkoff Invest API Client Adapter - Hexagonal Architecture.
 
-Adapter for Tinkoff Invest API integration using tinkoff-investments library.
+Production adapter for Tinkoff Invest API integration.
+Implements BrokerClient port interface for production trading.
 """
 
 from decimal import Decimal
@@ -76,20 +77,41 @@ class TinkoffInvestClient:
         Initialize Tinkoff Invest client.
 
         Args:
-            context_name: AsyncClient into Tinkoff
+            account_id: Tinkoff API account identifier
+            context_name: aiomisc context key (TINKOFF_INVEST or TINKOFF_INVEST_SANDBOX)
         """
         self._account_id = account_id
         self._context_name = context_name
+        self._client = None
 
-    async def init_client(self) -> AsyncServices:
+    async def init_client(self) -> 'TinkoffInvestClient':
+        """
+        Initialize client from aiomisc context.
+
+        Must be called after __init__ to connect to Tinkoff API.
+
+        Returns:
+            Self for method chaining
+
+        Raises:
+            TinkoffClientError: If client not found in context
+        """
         if self._client is None:
             self._client = await get_context()[self._context_name]
-        raise TinkoffClientError('Not found tinkoff client')
+
+        if not self._client:
+            raise TinkoffClientError(
+                f'Tinkoff client not found in context: {self._context_name}',
+            )
+
+        return self
 
     def __ensure_client(self) -> AsyncServices:
         """Ensure client is initialized."""
         if not self._client:
-            raise TinkoffClientError('Client not initialized. Use as async context manager.')
+            raise TinkoffClientError(
+                'Client not initialized. Call init_client() first.',
+            )
         return self._client
 
     async def get_instrument_by_ticker(self, ticker: str) -> dict[str, Any]:

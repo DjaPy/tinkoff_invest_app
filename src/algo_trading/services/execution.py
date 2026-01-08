@@ -1,13 +1,20 @@
 """Order Execution Service via Tinkoff API.
 
 Handles real order execution through Tinkoff Invest broker.
+Routes to production or sandbox based on strategy's account type.
 """
 
 from decimal import Decimal
 from uuid import UUID
 
+from beanie import PydanticObjectId
+
 from src.algo_trading.adapters.models import OrderStatusEnum, TradeOrderDocument
 from src.algo_trading.adapters.tinkoff_client import TinkoffInvestClient
+from src.algo_trading.adapters.tinkoff_client_factory import (
+    TinkoffClientFactory,
+    TinkoffClientFactoryError,
+)
 
 
 class ExecutionError(Exception):
@@ -19,6 +26,7 @@ class TinkoffExecutionService:
     Service for executing orders via Tinkoff Invest API.
 
     Handles order placement, cancellation, and status tracking.
+    Routes to production or sandbox client based on strategy's account type.
     """
 
     def __init__(self, tinkoff_client: TinkoffInvestClient) -> None:
@@ -26,10 +34,33 @@ class TinkoffExecutionService:
         Initialize execution service.
 
         Args:
-            tinkoff_client: Tinkoff Invest API client
+            tinkoff_client: Tinkoff Invest API client (production or sandbox)
         """
         self.client = tinkoff_client
         self._figi_cache: dict[str, str] = {}
+
+    @classmethod
+    async def create_for_account(cls, account_id: PydanticObjectId) -> 'TinkoffExecutionService':
+        """
+        Create TinkoffExecutionService with correct client routing.
+
+        Factory method that creates service with production or sandbox client
+        based on account type.
+
+        Args:
+            account_id: TinkoffAccount MongoDB ID
+
+        Returns:
+            TinkoffExecutionService configured for account's environment
+
+        Raises:
+            ExecutionError: If client creation fails
+        """
+        try:
+            client = await TinkoffClientFactory.create_client_for_account(account_id)
+            return cls(tinkoff_client=client)
+        except TinkoffClientFactoryError as e:
+            raise ExecutionError(f'Failed to create execution service: {e}') from e
 
     async def _get_figi(self, ticker: str) -> str:
         """

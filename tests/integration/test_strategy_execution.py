@@ -6,16 +6,16 @@ respecting risk limits.
 
 from http import HTTPStatus
 
-
-from src.algo_trading.adapters.models import StrategyStatusEnum
-
+from src.algo_trading.adapters.models import StrategyStatusEnum, TinkoffAccountType
 
 
-async def test_real_time_strategy_execution_and_risk_management(client, config, mongo_connection, mock_auth):
+async def test_real_time_strategy_execution_and_risk_management(client, config, mock_auth, create_tinkoff_account):
     """
     Integration test for real-time strategy execution workflow.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'Execution Test Strategy',
         'strategy_type': 'momentum',
@@ -83,13 +83,15 @@ async def test_real_time_strategy_execution_and_risk_management(client, config, 
 
 
 
-async def test_strategy_execution_monitoring_endpoints(client, config, mongo_connection, mock_auth):
+async def test_strategy_execution_monitoring_endpoints(client, config, mock_auth, create_tinkoff_account):
     """
     Test all monitoring endpoints work correctly during strategy execution.
 
     Validates complete observability of running strategy.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'Monitoring Test Strategy',
         'strategy_type': 'mean_reversion',
@@ -144,13 +146,15 @@ async def test_strategy_execution_monitoring_endpoints(client, config, mongo_con
 
 
 
-async def test_strategy_execution_with_disabled_risk_controls(client, config, mongo_connection, mock_auth):
+async def test_strategy_execution_with_disabled_risk_controls(client, config, mock_auth, create_tinkoff_account):
     """
     Test strategy execution with risk controls disabled.
 
     Validates that strategies can run without risk limits if configured.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'No Risk Controls Strategy',
         'strategy_type': 'momentum',

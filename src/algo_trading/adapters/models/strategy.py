@@ -2,11 +2,13 @@
 
 from datetime import datetime, timezone, UTC
 from decimal import Decimal
+from enum import StrEnum
 from functools import partial
+from typing import Any
 from uuid import UUID, uuid4
 
 import pymongo
-from beanie import Document
+from beanie import Document, Link
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 from src.algo_trading.adapters.models.common import DecimalField
@@ -73,6 +75,51 @@ class RiskControls(BaseModel):
         return v
 
 
+class TinkoffAccountType(StrEnum):
+    """Type of Tinkoff account."""
+
+    PRODUCTION = 'production'
+    SANDBOX = 'sandbox'
+
+
+class TinkoffAccountDocument(Document):
+    """
+    Tinkoff Invest brokerage account (production or sandbox).
+
+    Represents a trading account from Tinkoff Invest API.
+    Users can have multiple accounts for different purposes:
+    - Production accounts for real trading
+    - Sandbox accounts for testing strategies
+
+    One strategy references one account via tinkoff_account_id.
+    """
+    account_id: str = Field(description='Tinkoff API account identifier')
+
+    account_type: TinkoffAccountType = Field(description='Production or sandbox account')
+    name: str = Field(min_length=1, max_length=200, description='User-friendly account name')
+    user_id: UUID = Field(description='Owner user identifier')
+    is_default: bool = Field(default=False, description='Default account for this user and type')
+    created_at: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc),
+        description='Account creation timestamp',
+    )
+    updated_at: datetime = Field(
+        default_factory=partial(datetime.now, timezone.utc),
+        description='Last update timestamp',
+    )
+    initial_balance: float | None = Field(
+        default=None,
+        description='Initial sandbox balance (rubles) - only for sandbox accounts',
+    )
+
+    class Settings:
+        name = 'tinkoff_accounts'
+        indexes = [
+            pymongo.IndexModel([('user_id', pymongo.ASCENDING), ('account_type', pymongo.ASCENDING)]),
+            pymongo.IndexModel([('account_id', pymongo.ASCENDING)], unique=True),
+        ]
+
+
 class TradingStrategyDocument(Document):
     """
     Algorithmic trading strategy configuration.
@@ -94,10 +141,13 @@ class TradingStrategyDocument(Document):
         default_factory=partial(datetime.now, timezone.utc), description='Last update timestamp',
     )
     created_by: UUID = Field(description='User identifier')
+    tinkoff_account: Link[TinkoffAccountDocument] = Field(
+        description='Reference to Tinkoff account (production or sandbox)',
+    )
 
     @field_validator('parameters', mode='before')
     @classmethod
-    def validate_parameters(cls, v: dict | BaseModel, info: ValidationInfo) -> BaseModel:
+    def validate_parameters(cls, v: dict[str, Any] | BaseModel, info: ValidationInfo) -> BaseModel:
         """Validate and convert strategy parameters based on strategy type."""
         strategy_type = info.data.get('strategy_type')
 

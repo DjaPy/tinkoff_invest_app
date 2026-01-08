@@ -19,10 +19,13 @@ from src.algo_trading.adapters.models.strategy import (
     MomentumParameters,
     RiskControls,
     TradingStrategyDocument,
+    TinkoffAccountDocument,
+    TinkoffAccountType,
 )
 
 
 BEANIE_MODELS = [
+    TinkoffAccountDocument,
     TradingStrategyDocument,
     TradeOrderDocument,
     MarketDataDocument,
@@ -45,6 +48,8 @@ __all__ = [
     'RiskControls',
     'StrategyStatusEnum',
     'StrategyTypeEnum',
+    'TinkoffAccountDocument',
+    'TinkoffAccountType',
     'TradeOrderDocument',
     'TradingSessionDocument',
     'TradingStrategyDocument',

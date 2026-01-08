@@ -60,7 +60,6 @@ class MeanReversionStrategy(TradingStrategyBase):
         ma_period = self.parameters['moving_average_period']
         std_threshold = Decimal(str(self.parameters['std_dev_threshold']))
 
-        # Need enough data for MA calculation
         if len(historical_data) < ma_period:
             return StrategySignal(
                 signal_type=SignalType.HOLD,

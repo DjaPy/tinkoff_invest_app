@@ -5,16 +5,17 @@ Validates user story: Pause, resume, and stop trading strategies as needed.
 
 from http import HTTPStatus
 
-
-from src.algo_trading.adapters.models import StrategyStatusEnum
-
+from src.algo_trading.adapters.models import StrategyStatusEnum, TinkoffAccountType
 
 
-async def test_complete_strategy_lifecycle(client, config, mongo_connection, mock_auth):
+async def test_complete_strategy_lifecycle(client, config, mock_auth, create_tinkoff_account):
     """
     Integration test for complete strategy lifecycle workflow.
     """
     user_id = mock_auth
+
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'Lifecycle Test Strategy',
         'strategy_type': 'momentum',
@@ -97,13 +98,15 @@ async def test_complete_strategy_lifecycle(client, config, mongo_connection, moc
 
 
 
-async def test_invalid_state_transitions(client, config, mongo_connection, mock_auth):
+async def test_invalid_state_transitions(client, config, mock_auth, create_tinkoff_account):
     """
     Test that invalid state transitions are rejected.
 
     Validates state machine enforcement.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'Invalid Transition Strategy',
         'strategy_type': 'momentum',
@@ -143,13 +146,15 @@ async def test_invalid_state_transitions(client, config, mongo_connection, mock_
 
 
 
-async def test_strategy_deletion(client, config, mongo_connection, mock_auth):
+async def test_strategy_deletion(client, config, mock_auth, create_tinkoff_account):
     """
     Test strategy deletion workflow.
 
     Validates cleanup and resource management.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     strategy_data = {
         'name': 'Delete Test Strategy',
         'strategy_type': 'momentum',

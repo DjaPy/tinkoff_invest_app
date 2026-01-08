@@ -15,8 +15,14 @@ from src.algo_trading.adapters.repositories.strategy_repository import (
     InvalidStateTransitionError,
     StrategyRepository,
 )
+from src.algo_trading.adapters.repositories.tinkoff_account_repository import (
+    TinkoffAccountRepository,
+)
 from src.algo_trading.enums import StrategyStatusEnum
-from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
+from src.algo_trading.adapters.models.strategy import (
+    TinkoffAccountType,
+    TradingStrategyDocument,
+)
 from src.algo_trading.ports.api.v1.schemas.strategies_schema import (
     CreateStrategyRequestSchema,
     StrategyListResponseSchema,
@@ -62,6 +68,7 @@ async def create_strategy(
         parameters=request.parameters,
         risk_controls=request.risk_controls,
         created_by=current_user.user_id,
+        tinkoff_account_type=request.tinkoff_account_type,
     )
 
     return TradingStrategyResponseSchema.from_document(strategy)
@@ -289,3 +296,71 @@ async def pause_strategy(strategy_id: UUID) -> TradingStrategyDocument:
         ) from err
     except InvalidStateTransitionError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+
+
+@strategies_router.post(
+    '/{strategy_id}/clone-to-sandbox',
+    response_model=TradingStrategyResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary='Clone strategy to sandbox',
+    description='Create a sandbox copy of strategy for safe parameter testing',
+)
+async def clone_strategy_to_sandbox(
+    strategy_id: UUID,
+    current_user: UserData = Depends(get_current_active_user),
+) -> TradingStrategyResponseSchema:
+    """
+    Clone strategy to user's default sandbox account.
+
+    Creates a copy of the strategy with same parameters but linked
+    to sandbox account. Useful for A/B testing parameter changes safely.
+
+    Args:
+        strategy_id: Source strategy UUID to clone
+        current_user: Authenticated user from JWT token
+
+    Returns:
+        Cloned strategy with new UUID, inactive status, sandbox account
+
+    Raises:
+        HTTPException 404: Strategy not found or no default sandbox account
+        HTTPException 403: User doesn't own the strategy
+        HTTPException 500: Internal server error
+    """
+    source_strategy = await StrategyRepository.find_by_id(strategy_id)
+    if not source_strategy:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Strategy {strategy_id} not found',
+        )
+
+    if source_strategy.created_by != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail='You do not own this strategy',
+        )
+
+    sandbox_account = await TinkoffAccountRepository.get_default_account(
+        user_id=current_user.user_id,
+        account_type=TinkoffAccountType.SANDBOX,
+    )
+
+    if not sandbox_account:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail='No default sandbox account found. Create a sandbox account first.',
+        )
+
+    try:
+        cloned_strategy = await StrategyRepository.clone_to_sandbox(
+            strategy_id=strategy_id,
+            sandbox_account=sandbox_account,
+        )
+
+        return TradingStrategyResponseSchema.from_document(cloned_strategy)
+
+    except ValueError as err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(err),
+        ) from err

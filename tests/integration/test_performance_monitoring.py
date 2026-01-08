@@ -8,21 +8,24 @@ from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 from http import HTTPStatus
 
+from src.algo_trading.adapters.models import TinkoffAccountType
 from src.algo_trading.enums import OrderSideEnum
 
 
 async def test_performance_monitoring_and_analytics(
     client,
     config,
-    mongo_connection,
     mock_auth,
     create_trading_sessions,
     create_order,
+    create_tinkoff_account,
 ):
     """
     Integration test for performance monitoring workflow.
     """
     user_id = mock_auth
+
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
 
     strategy_data = {
         'name': 'Performance Monitoring Strategy',
@@ -144,15 +147,18 @@ async def test_performance_monitoring_and_analytics(
 async def test_performance_metrics_for_inactive_strategy(
         client,
         config,
-        mongo_connection,
         mock_auth,
         create_trading_sessions,
+        create_tinkoff_account,
 ):
     """
     Test performance metrics for strategy that hasn't executed any trades.
 
     Validates graceful handling of empty performance data.
     """
+    user_id = mock_auth
+
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
     strategy_data = {
         'name': 'Inactive Performance Strategy',
         'strategy_type': 'momentum',
@@ -172,7 +178,7 @@ async def test_performance_metrics_for_inactive_strategy(
             'trading_hours_start': '09:30:00',
             'trading_hours_end': '16:00:00',
         },
-        'created_by': 'test_user',
+        'created_by': str(user_id),
     }
 
     async with client.post(

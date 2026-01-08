@@ -18,7 +18,6 @@ from src.algo_trading.adapters.models.metrics import PerformanceMetricsDocument
 
 async def test_get_strategy_performance_returns_metrics(
         config,
-        services,
         client,
         pydantic_generator_data,
         create_trading_strategy,

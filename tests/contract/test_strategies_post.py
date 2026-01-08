@@ -9,11 +9,19 @@ from decimal import Decimal
 
 from starlette import status
 
-from src.algo_trading.adapters.models.strategy import TradingStrategyDocument
+from algo_trading.adapters.models import TinkoffAccountType
+from algo_trading.ports.api.v1.schemas.strategies_schema import TradingStrategyResponseSchema
 
 
-async def test_post_strategies_creates_new_strategy(client, config, mongo_connection, mock_auth):
+async def test_post_strategies_creates_new_strategy(
+    client,
+    config,
+    mongo_connection,
+    mock_auth,
+    create_tinkoff_account,
+):
     """Test POST /api/v1/strategies creates a new trading strategy"""
+    await create_tinkoff_account(user_id=mock_auth, account_type=TinkoffAccountType.SANDBOX)
     strategy_data = {
         'name': 'Test Momentum Strategy',
         'strategy_type': 'momentum',
@@ -41,12 +49,11 @@ async def test_post_strategies_creates_new_strategy(client, config, mongo_connec
         headers={'Authorization': 'Bearer test-token', 'Content-Type': 'application/json'},
         json=strategy_data,
     ) as response:
+        data = await response.json()
         assert response.status == status.HTTP_201_CREATED
         assert 'application/json' in response.headers['content-type']
 
-        data = await response.json()
-
-        strategy = TradingStrategyDocument(**data)
+        strategy = TradingStrategyResponseSchema(**data)
         assert strategy.name == strategy_data['name']
         assert strategy.strategy_type.value == strategy_data['strategy_type']
         assert strategy.status.value == 'inactive'

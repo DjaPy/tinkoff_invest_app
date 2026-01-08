@@ -5,10 +5,10 @@ Validates risk management framework integration.
 
 from http import HTTPStatus
 
+from src.algo_trading.adapters.models import TinkoffAccountType
 
 
-
-async def test_risk_controls_enforcement(client, config, mongo_connection, mock_auth):
+async def test_risk_controls_enforcement(client, config, mongo_connection, mock_auth, create_tinkoff_account):
     """
     Integration test for risk controls enforcement.
 
@@ -16,6 +16,8 @@ async def test_risk_controls_enforcement(client, config, mongo_connection, mock_
     """
 
     user_id = mock_auth
+
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
 
     strategy_data = {
         'name': 'Risk Control Test Strategy',
@@ -66,13 +68,15 @@ async def test_risk_controls_enforcement(client, config, mongo_connection, mock_
 
 
 
-async def test_risk_controls_validation(client, config, mongo_connection, mock_auth):
+async def test_risk_controls_validation(client, config, mock_auth, create_tinkoff_account):
     """
     Test risk controls validation on strategy creation.
 
     Validates proper error handling for invalid risk parameters.
     """
     user_id = mock_auth
+    await create_tinkoff_account(user_id=user_id, account_type=TinkoffAccountType.SANDBOX)
+
     invalid_strategy = {
         'name': 'Invalid Risk Strategy',
         'strategy_type': 'momentum',
@@ -104,12 +108,14 @@ async def test_risk_controls_validation(client, config, mongo_connection, mock_a
 
 
 
-async def test_update_risk_controls_on_running_strategy(client, config, mongo_connection, mock_auth):
+async def test_update_risk_controls_on_running_strategy(client, config, mock_auth, create_tinkoff_account):
     """
     Test updating risk controls on a running strategy.
 
     Validates dynamic risk management.
     """
+
+    await create_tinkoff_account(user_id=mock_auth, account_type=TinkoffAccountType.SANDBOX)
 
     strategy_data = {
         'name': 'Dynamic Risk Strategy',
