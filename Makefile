@@ -3,17 +3,13 @@
 NAME=src
 
 ifeq ($(OS), Windows_NT)
- VENV_BIN = $(VENV_PATH)/Scripts
- PYTHON_BIN = python
+	PYTHON_BIN = python
 else
- VENV_BIN = $(VENV_PATH)/bin
- PYTHON_BIN = python3
+	PYTHON_BIN = python3
 endif
 
-POETRY_PATH := $(shell poetry env info --path)
 CURRENT_PATH := $(shell pwd)
-POETRY_PATH_BIN := $(POETRY_PATH)/bin
-BROWSER := $(PYTHON) -c "import os,sys,webbrowser;webbrowser.open('file://' + os.path.realpath(sys.argv[1]))"
+BROWSER := $(PYTHON_BIN) -c "import os,sys,webbrowser;webbrowser.open('file://' + os.path.realpath(sys.argv[1]))"
 
 .PHONY: clean
 clean: clean-pyc clean-test clean-venv clean-docs clean-install clean-mypy ## remove all build, test, coverage and Python artifacts
@@ -49,41 +45,76 @@ clean-docs:
 clean-mypy:
 	rm -rf .mypy_cache
 
-.PHONY: poetry  # A shortcut for "$(VENV_PATH)/pip-status"
-poetry: ## Install (upgrade) all development requirements
-	poetry install
+.PHONY: clean-venv
+clean-venv:
+	rm -rf .venv
+
+.PHONY: install
+install: ## Install all dependencies with uv
+	uv sync
+
+.PHONY: lock
+lock: ## Update lock file
+	uv lock
 
 .PHONY: shell
-shell: ## poetry shell
-	poetry shell  ## Activate poetry shell
+shell: ## Activate virtual environment (print activation command)
+	@echo "Run: source .venv/bin/activate"
 
 .PHONY: ruff
-ruff: ## ruff
-	poetry run ruff check ./$(NAME) ./tests --fix
+ruff: ## ruff check and fix
+	uv run ruff check ./$(NAME) ./tests --fix
+
+.PHONY: ruff-format
+ruff-format: ## ruff format
+	uv run ruff format ./$(NAME) ./tests
 
 .PHONY: pip-audit
-pip-audit: # checks your installed dependencies for known security vulnerabilities
-	poetry run pip-audit
+pip-audit: ## checks dependencies for known security vulnerabilities
+	uv run pip-audit
 
 .PHONY: mypy
 mypy: ## static type check
-	poetry run mypy $(NAME)
+	uv run mypy $(NAME)
 
 .PHONY: isort
 isort: ## sorted imports
-	poetry run isort ./$(NAME) ./tests
+	uv run isort ./$(NAME) ./tests
 
 .PHONY: lint
-lint: ruff mypy pip-audit ## lint
+lint: ruff mypy pip-audit ## run all linters
+
+.PHONY: format
+format: isort ruff-format ## format code
+
+.PHONY: test
+test: ## run tests
+	uv run pytest
+
+.PHONY: test-unit
+test-unit: ## run unit tests
+	uv run pytest tests/unit/
+
+.PHONY: test-integration
+test-integration: ## run integration tests
+	uv run pytest tests/integration/
+
+.PHONY: test-contract
+test-contract: ## run contract tests
+	uv run pytest tests/contract/
+
+.PHONY: run
+run: ## run application
+	uv run python -m src
 
 .PHONY: doc
-docs: venv clean-docs  ## Make documentation and open it in browser
-	$(VENV_BIN)/sphinx-apidoc -o docs/source/ $(NAME)
-	$(VENV_ACTIVATE) && $(MAKE) -C docs html
+docs: clean-docs ## Make documentation and open it in browser
+	uv run sphinx-apidoc -o docs/source/ $(NAME)
+	$(MAKE) -C docs html
 	ifndef CI
 		$(BROWSER) docs/build/html/index.html
 	endif
 
 .PHONY: help
-help:  ## Show this help message and exit
+help: ## Show this help message and exit
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-23s\033[0m %s\n", $$1, $$2}'

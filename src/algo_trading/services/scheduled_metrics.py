@@ -25,7 +25,7 @@ class ScheduledMetricsService(PeriodicService):
     Uses PerformanceAnalytics service with caching to avoid duplicate calculations.
     """
 
-    interval = 24 * 60 * 60  # 24 hours in seconds
+    interval = 24 * 60 * 60
 
     def __init__(self, run_at_startup: bool = False) -> None:
         """
@@ -49,13 +49,11 @@ class ScheduledMetricsService(PeriodicService):
         logger.info('Starting scheduled metrics calculation job')
 
         try:
-            # Execute on startup if configured
             if self.run_at_startup and not self._startup_executed:
                 await self._calculate_metrics_for_all_strategies()
                 self._startup_executed = True
                 return
 
-            # Regular scheduled execution
             await self._calculate_metrics_for_all_strategies()
 
         except Exception:
@@ -63,14 +61,10 @@ class ScheduledMetricsService(PeriodicService):
 
     async def _calculate_metrics_for_all_strategies(self) -> None:
         """Calculate metrics for all active strategies."""
-        # Calculate for yesterday (full day)
         period_end = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
         period_start = period_end - timedelta(days=1)
 
-        # Find all active or deployed strategies
-        strategies = await TradingStrategyDocument.find(
-            TradingStrategyDocument.status == StrategyStatusEnum.ACTIVE,
-        ).to_list()
+        strategies = await TradingStrategyDocument.find(status=StrategyStatusEnum.ACTIVE).to_list()
 
         if not strategies:
             logger.info('No active strategies found for metrics calculation')

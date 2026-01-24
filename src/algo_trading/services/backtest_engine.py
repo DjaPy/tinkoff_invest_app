@@ -3,6 +3,7 @@
 Orchestrates backtesting strategies against historical data.
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -10,6 +11,8 @@ from typing import Any
 
 from src.algo_trading.adapters.models.market_data import MarketDataDocument
 from src.algo_trading.domain.analytics.performance_calculator import PerformanceCalculator, PerformanceResult, Trade
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -121,6 +124,8 @@ class BacktestEngine:
         """
         data_by_instrument = {}
 
+        logger.info(f"Loading market data for {len(instruments)} instruments from {period_start} to {period_end}")
+
         for instrument in instruments:
             market_data = (
                 await MarketDataDocument.find(
@@ -133,6 +138,7 @@ class BacktestEngine:
             )
 
             data_by_instrument[instrument] = market_data
+            logger.info(f"  {instrument}: loaded {len(market_data)} data points")
 
         return data_by_instrument
 
@@ -165,29 +171,31 @@ class BacktestEngine:
         # Simplified momentum strategy simulation
         if config.strategy_type == 'momentum':
             lookback = config.parameters.get('lookback_period', 20)
+            threshold = Decimal(str(config.parameters.get('momentum_threshold', 0.02)))
+
+            logger.debug(f"Momentum strategy: lookback={lookback}, threshold={threshold}")
 
             for instrument, data in market_data.items():
+                logger.debug(f"Processing {instrument}: {len(data)} data points")
+
                 if len(data) < lookback + 1:
+                    logger.warning(f"  Skipping {instrument}: insufficient data ({len(data)} < {lookback + 1})")
                     continue
 
+                signals_generated = 0
                 for i in range(lookback, len(data)):
-                    # Calculate momentum
-                    current_price = data[i].price
-                    past_price = data[i - lookback].price
+                    current_price = data[i].close_price
+                    past_price = data[i - lookback].close_price
                     momentum = (current_price - past_price) / past_price
 
-                    threshold = Decimal(str(config.parameters.get('momentum_threshold', 0.02)))
-
-                    # Generate signal
                     if momentum > threshold:
-                        # Buy signal
-                        quantity = Decimal('1')  # Simplified position sizing
+                        signals_generated += 1
+                        quantity = Decimal('1')
                         entry_price = current_price
                         commission = entry_price * quantity * config.commission_rate
 
-                        # Simulate exit after holding period
                         exit_idx = min(i + 5, len(data) - 1)
-                        exit_price = data[exit_idx].price
+                        exit_price = data[exit_idx].close_price
 
                         pnl = (exit_price - entry_price) * quantity - commission * 2
                         return_pct = pnl / (entry_price * quantity)
@@ -209,7 +217,11 @@ class BacktestEngine:
                             },
                         )
 
-        # Ensure equity curve has at least ending value
+                instrument_trades = [t for t in trades if t['instrument'] == instrument]
+                logger.info(f"  {instrument}: {signals_generated} signals → {len(instrument_trades)} trades")
+
+            logger.info(f"Total: {len(trades)} trades executed")
+
         if len(equity_curve) == 1:
             equity_curve.append(current_capital)
 

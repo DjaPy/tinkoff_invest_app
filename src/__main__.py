@@ -1,7 +1,17 @@
-import asyncio
+import logging
 
 from aiomisc import entrypoint
 
+from algo_trading.adapters.models import (
+    MarketDataDocument,
+    PerformanceMetricsDocument,
+    PortfolioPositionDocument,
+    TinkoffAccountDocument,
+    TradeOrderDocument,
+    TradingSessionDocument,
+    TradingStrategyDocument,
+)
+from sandbox.collections import SandboxAccount
 from src.algo_trading.ports.api.v1 import (
     analytics_router,
     orders_router,
@@ -18,6 +28,22 @@ from src.consts import FASTAPI_SERVICE, MONGO_DB, TINKOFF_INVEST_SANDBOX
 from src.sandbox.entrypoint.api_v1.account import account_router
 from src.users.ports.api.v1.auth import auth_router
 from src.users.ports.api.v1.users import users_router
+from users.adapters.models.users import UserDocument
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger()
+
+BEANIE_MODELS = [
+    TinkoffAccountDocument,
+    TradingStrategyDocument,
+    TradeOrderDocument,
+    MarketDataDocument,
+    PortfolioPositionDocument,
+    PerformanceMetricsDocument,
+    TradingSessionDocument,
+    SandboxAccount,
+    UserDocument,
+]
 
 fastapi_service = FastAPIService(
     settings=config.http,
@@ -38,8 +64,10 @@ tinkoff_invest_sandbox = TinkoffInvestServiceSandbox(
     settings=config.tinkoff_invest,
     context_name=TINKOFF_INVEST_SANDBOX,
 )
-mongo_service = MongoDBService(settings=config.mongo_db, context_name=MONGO_DB)
+mongo_service = MongoDBService(settings=config.mongo_db, models=BEANIE_MODELS, context_name=MONGO_DB)
 scheduled_metrics_service = ScheduledMetricsService(run_at_startup=False)
+
+logger.info('Inits all dependencies')
 
 
 if __name__ == '__main__':
@@ -50,11 +78,6 @@ if __name__ == '__main__':
         scheduled_metrics_service,
         log_level='info',
         log_format='color',
-        log_buffering=True,
-        log_buffer_size=1024,
-        log_flush_interval=0.2,
-        log_config=True,
-        policy=asyncio.DefaultEventLoopPolicy(),
-        debug=False,
     ) as loop:
+        logger.info('Starting Tinkoff Invest Service')
         loop.run_forever()

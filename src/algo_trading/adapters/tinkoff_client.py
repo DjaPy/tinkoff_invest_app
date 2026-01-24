@@ -3,9 +3,9 @@
 Production adapter for Tinkoff Invest API integration.
 Implements BrokerClient port interface for production trading.
 """
-
+import logging
 from decimal import Decimal
-from typing import Any
+from typing import Any, Self
 
 from aiomisc import get_context
 from t_tech.invest import CandleInterval, InstrumentIdType, OrderDirection
@@ -15,6 +15,9 @@ from t_tech.invest.async_services import AsyncServices
 from t_tech.invest.schemas import MoneyValue
 
 from src.algo_trading.adapters.models import OrderSideEnum, OrderTypeEnum
+
+
+logger = logging.getLogger(__name__)
 
 
 class TinkoffClientError(Exception):
@@ -84,7 +87,7 @@ class TinkoffInvestClient:
         self._context_name = context_name
         self._client = None
 
-    async def init_client(self) -> 'TinkoffInvestClient':
+    async def init_client(self) -> Self:
         """
         Initialize client from aiomisc context.
 
@@ -96,8 +99,13 @@ class TinkoffInvestClient:
         Raises:
             TinkoffClientError: If client not found in context
         """
-        if self._client is None:
-            self._client = await get_context()[self._context_name]
+        try:
+            if self._client is None:
+                self._client = await get_context()[self._context_name]
+
+        except KeyError as err:
+            logger.error('Tinkoff client not found in context: %s, with err %s')
+            self._client = None
 
         if not self._client:
             raise TinkoffClientError(
